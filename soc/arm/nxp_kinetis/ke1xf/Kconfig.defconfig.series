@@ -56,10 +56,6 @@ config COUNTER_MCUX_LPTMR
 
 endif # COUNTER
 
-config PWM_MCUX_FTM
-	default y
-	depends on PWM
-
 config PWM_MCUX_PWT
 	default y
 	depends on PWM_CAPTURE
@@ -74,10 +70,6 @@ config SOC_FLASH_MCUX
 config I2C_MCUX_LPI2C
 	default y
 	depends on I2C
-
-config SPI_MCUX_LPSPI
-	default y
-	depends on SPI
 
 config ADC_MCUX_ADC12
 	default y

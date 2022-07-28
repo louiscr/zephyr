@@ -16,10 +16,6 @@ config I2C_MCUX_FLEXCOMM
 	default y if HAS_MCUX_FLEXCOMM
 	depends on I2C
 
-config SPI_MCUX_FLEXCOMM
-	default y if HAS_MCUX_FLEXCOMM
-	depends on SPI
-
 config I2S_MCUX_FLEXCOMM
 	default y if HAS_MCUX_FLEXCOMM
 	depends on I2S
@@ -54,10 +50,6 @@ endif # CORTEX_M_SYSTICK
 config COUNTER_MCUX_LPC_RTC
 	default y
 	depends on COUNTER
-
-config PWM_MCUX_SCTIMER
-	default y
-	depends on PWM
 
 config WDT_MCUX_WWDT
 	default y
