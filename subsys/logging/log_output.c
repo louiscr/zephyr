@@ -274,6 +274,18 @@ static int timestamp_print(const struct log_output *output,
 					hours, mins, seconds, ms * 1000U + us);
 #endif
 		} else {
+			if (IS_ENABLED(CONFIG_LOG_OUTPUT_FORMAT_UNITRON)) {
+				char time_str[sizeof("1970-01-01T00:00:00")];
+				struct tm *tm;
+				time_t time;
+
+				time = total_seconds;
+				tm = gmtime(&time);
+
+				strftime(time_str, sizeof(time_str), "%FT%T", tm);
+
+				length = print_formatted(output, "[%s] ", time_str);
+			} else 
 			if (IS_ENABLED(CONFIG_LOG_OUTPUT_FORMAT_LINUX_TIMESTAMP)) {
 				length = print_formatted(output,
 							"[%5ld.%06d] ",

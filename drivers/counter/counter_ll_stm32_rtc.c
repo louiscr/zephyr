@@ -213,6 +213,36 @@ static int rtc_stm32_get_value(const struct device *dev, uint32_t *ticks)
 	return 0;
 }
 
+static int rtc_stm32_set_value(const struct device *dev, uint32_t ticks)
+{
+	time_t ts;
+	
+	ts = counter_ticks_to_us(dev, ticks) / USEC_PER_SEC;
+	
+	ts += T_TIME_OFFSET;
+	
+	struct tm time = { 0 };
+	gmtime_r(&ts, &time);
+	
+	time.tm_year -= 100;
+	time.tm_mon += 1;
+	
+	LL_RTC_DisableWriteProtection(RTC);
+	LL_RTC_EnterInitMode(RTC);
+	
+	LL_RTC_DATE_SetYear(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_year));
+	LL_RTC_DATE_SetMonth(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_mon));
+	LL_RTC_DATE_SetDay(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_mday));
+	LL_RTC_TIME_SetHour(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_hour));
+	LL_RTC_TIME_SetMinute(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_min));
+	LL_RTC_TIME_SetSecond(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_sec));
+	
+	LL_RTC_ExitInitMode(RTC);
+	LL_RTC_EnableWriteProtection(RTC);
+	
+	return 0;
+}
+
 static int rtc_stm32_set_alarm(const struct device *dev, uint8_t chan_id,
 				const struct counter_alarm_cfg *alarm_cfg)
 {
@@ -504,6 +534,7 @@ static const struct counter_driver_api rtc_stm32_driver_api = {
 		.start = rtc_stm32_start,
 		.stop = rtc_stm32_stop,
 		.get_value = rtc_stm32_get_value,
+		.set_value = rtc_stm32_set_value,
 		.set_alarm = rtc_stm32_set_alarm,
 		.cancel_alarm = rtc_stm32_cancel_alarm,
 		.set_top_value = rtc_stm32_set_top_value,
