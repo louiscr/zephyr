@@ -29,7 +29,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 LOG_MODULE_REGISTER(max7219, CONFIG_DISPLAY_LOG_LEVEL);
 
 #define MAX7219_SEGMENTS_PER_DIGIT 8
@@ -314,7 +314,7 @@ static int max7219_init(const struct device *dev)
 	struct max7219_data *dev_data = dev->data;
 	int ret;
 
-	if (!spi_is_ready(&dev_config->spi)) {
+	if (!spi_is_ready_dt(&dev_config->spi)) {
 		LOG_ERR("SPI device not ready");
 		return -ENODEV;
 	}

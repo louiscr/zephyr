@@ -13,6 +13,8 @@ import collections
 from collections import OrderedDict
 from itertools import islice
 import logging
+import copy
+import shutil
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
@@ -29,7 +31,7 @@ from twisterlib.config_parser import TwisterConfigParser
 from twisterlib.testinstance import TestInstance
 
 
-from zephyr_module import west_projects, parse_modules
+from zephyr_module import parse_modules
 
 ZEPHYR_BASE = os.getenv("ZEPHYR_BASE")
 if not ZEPHYR_BASE:
@@ -50,8 +52,10 @@ class Filters:
     TESTSUITE = 'testsuite filter'
     # filters realted to platform definition
     PLATFORM = 'Platform related filter'
-    # in case a testcase was quarantined.
+    # in case a test suite was quarantined.
     QUARENTINE = 'Quarantine filter'
+    # in case a test suite is skipped intentionally .
+    SKIP = 'Skip filter'
 
 
 class TestPlan:
@@ -96,7 +100,7 @@ class TestPlan:
         sub_tests = self.options.sub_test
         if sub_tests:
             for subtest in sub_tests:
-                _subtests = self.get_testcase(subtest)
+                _subtests = self.get_testsuite(subtest)
                 for _subtest in _subtests:
                     self.run_individual_testsuite.append(_subtest.name)
 
@@ -225,10 +229,7 @@ class TestPlan:
 
     def handle_modules(self):
         # get all enabled west projects
-        west_proj = west_projects()
-        modules_meta = parse_modules(ZEPHYR_BASE,
-                                    [p.posixpath for p in west_proj['projects']]
-                                    if west_proj else None, None)
+        modules_meta = parse_modules(ZEPHYR_BASE)
         self.modules = [module.meta.get('name') for module in modules_meta]
 
 
@@ -249,15 +250,16 @@ class TestPlan:
         return 1
 
     def report_duplicates(self):
-        all_tests = self.get_all_tests()
-
-        dupes = [item for item, count in collections.Counter(all_tests).items() if count > 1]
+        all_identifiers = []
+        for _, ts in self.testsuites.items():
+            all_identifiers.append(ts.id)
+        dupes = [item for item, count in collections.Counter(all_identifiers).items() if count > 1]
         if dupes:
             print("Tests with duplicate identifiers:")
             for dupe in dupes:
                 print("- {}".format(dupe))
                 for dc in self.get_testsuite(dupe):
-                    print("  - {}".format(dc))
+                    print("  - {}".format(dc.name))
         else:
             print("No duplicates found.")
 
@@ -366,6 +368,34 @@ class TestPlan:
                         self.platforms.append(platform)
                         if platform.default:
                             self.default_platforms.append(platform.name)
+                        # support board@revision
+                        # if there is already an existed <board>_<revision>.yaml, then use it to
+                        # load platform directly, otherwise, iterate the directory to
+                        # get all valid board revision based on each <board>_<revision>.conf.
+                        if not "@" in platform.name:
+                            tmp_dir = os.listdir(os.path.dirname(file))
+                            for item in tmp_dir:
+                                # Need to make sure the revision matches
+                                # the permitted patterns as described in
+                                # cmake/modules/extensions.cmake.
+                                revision_patterns = ["[A-Z]",
+                                                     "[0-9]+",
+                                                     "(0|[1-9][0-9]*)(_[0-9]+)*(_[0-9]+)*"]
+
+                                for pattern in revision_patterns:
+                                    result = re.match(f"{platform.name}_(?P<revision>{pattern})\\.conf", item)
+                                    if result:
+                                        revision = result.group("revision")
+                                        yaml_file = f"{platform.name}_{revision}.yaml"
+                                        if yaml_file not in tmp_dir:
+                                            platform_revision = copy.deepcopy(platform)
+                                            revision = revision.replace("_", ".")
+                                            platform_revision.name = f"{platform.name}@{revision}"
+                                            platform_revision.default = False
+                                            self.platforms.append(platform_revision)
+
+                                        break
+
 
                 except RuntimeError as e:
                     logger.error("E: %s: can't load: %s" % (file, e))
@@ -377,7 +407,7 @@ class TestPlan:
         testcases = []
         for _, ts in self.testsuites.items():
             for case in ts.testcases:
-                testcases.append(case)
+                testcases.append(case.name)
 
         return testcases
 
@@ -451,6 +481,7 @@ class TestPlan:
                 plat = self.platform_names
             else:
                 plat = quar_dict['platforms']
+                self.verify_platforms_existence(plat, "quarantine-list")
             comment = quar_dict.get('comment', "NA")
             quarantine_list.append([{".".join([p, s]): comment}
                                    for p in plat for s in quar_dict['scenarios']])
@@ -487,14 +518,17 @@ class TestPlan:
                 )
 
                 instance.metrics['handler_time'] = ts.get('execution_time', 0)
-                instance.metrics['ram_size'] = ts.get("ram_size", 0)
-                instance.metrics['rom_size']  = ts.get("rom_size",0)
+                instance.metrics['used_ram'] = ts.get("used_ram", 0)
+                instance.metrics['used_rom']  = ts.get("used_rom",0)
+                instance.metrics['available_ram'] = ts.get('available_ram', 0)
+                instance.metrics['available_rom'] = ts.get('available_rom', 0)
 
                 status = ts.get('status', None)
                 reason = ts.get("reason", "Unknown")
                 if status in ["error", "failed"]:
                     instance.status = None
                     instance.reason = None
+                    instance.retries += 1
                 # test marked as passed (built only) but can run when
                 # --test-only is used. Reset status to capture new results.
                 elif status == 'passed' and instance.run and self.options.test_only:
@@ -566,7 +600,17 @@ class TestPlan:
         elif arch_filter:
             platforms = list(filter(lambda p: p.arch in arch_filter, self.platforms))
         elif default_platforms:
-            platforms = list(filter(lambda p: p.default, self.platforms))
+            _platforms = list(filter(lambda p: p.default, self.platforms))
+            platforms = []
+            # default platforms that can't be run are dropped from the list of
+            # the default platforms list. Default platforms should always be
+            # runnable.
+            for p in _platforms:
+                if p.simulation and p.simulation_exec:
+                    if shutil.which(p.simulation_exec):
+                        platforms.append(p)
+                else:
+                    platforms.append(p)
         else:
             platforms = self.platforms
 
@@ -636,7 +680,7 @@ class TestPlan:
                     instance.add_filter("Not part of integration platforms", Filters.TESTSUITE)
 
                 if ts.skip:
-                    instance.add_filter("Skip filter", Filters.TESTSUITE)
+                    instance.add_filter("Skip filter", Filters.SKIP)
 
                 if tag_filter and not ts.tags.intersection(tag_filter):
                     instance.add_filter("Command line testsuite tag filter", Filters.CMD_LINE)
@@ -757,7 +801,7 @@ class TestPlan:
                 and "Quarantine" not in filtered_instance.reason:
                 # Do not treat this as error if filter type is command line
                 filters = {t['type'] for t in filtered_instance.filters}
-                if Filters.CMD_LINE in filters:
+                if Filters.CMD_LINE in filters or Filters.SKIP in filters:
                     continue
                 filtered_instance.status = "error"
                 filtered_instance.reason += " but is one of the integration platforms"
@@ -777,7 +821,7 @@ class TestPlan:
         results = []
         for _, ts in self.testsuites.items():
             for case in ts.testcases:
-                if case == identifier:
+                if case.name == identifier:
                     results.append(ts)
         return results
 

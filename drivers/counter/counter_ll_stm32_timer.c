@@ -8,6 +8,8 @@
 
 #include <zephyr/drivers/counter.h>
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
+#include <zephyr/drivers/reset.h>
+#include <zephyr/irq.h>
 #include <zephyr/sys/atomic.h>
 
 #include <stm32_ll_tim.h>
@@ -35,11 +37,17 @@ static void(*const set_timer_compare[TIMER_MAX_CH])(TIM_TypeDef *,
 };
 
 /** Channel to compare get function mapping. */
+#if !defined(CONFIG_SOC_SERIES_STM32F4X)
+static uint32_t(*const get_timer_compare[TIMER_MAX_CH])(const TIM_TypeDef *) = {
+	LL_TIM_OC_GetCompareCH1, LL_TIM_OC_GetCompareCH2,
+	LL_TIM_OC_GetCompareCH3, LL_TIM_OC_GetCompareCH4,
+};
+#else
 static uint32_t(*const get_timer_compare[TIMER_MAX_CH])(TIM_TypeDef *) = {
 	LL_TIM_OC_GetCompareCH1, LL_TIM_OC_GetCompareCH2,
 	LL_TIM_OC_GetCompareCH3, LL_TIM_OC_GetCompareCH4,
 };
-
+#endif
 /** Channel to interrupt enable function mapping. */
 static void(*const enable_it[TIMER_MAX_CH])(TIM_TypeDef *) = {
 	LL_TIM_EnableIT_CC1, LL_TIM_EnableIT_CC2,
@@ -54,10 +62,17 @@ static void(*const disable_it[TIMER_MAX_CH])(TIM_TypeDef *) = {
 
 #ifdef CONFIG_ASSERT
 /** Channel to interrupt enable check function mapping. */
+#if !defined(CONFIG_SOC_SERIES_STM32F4X)
+static uint32_t(*const check_it_enabled[TIMER_MAX_CH])(const TIM_TypeDef *) = {
+	LL_TIM_IsEnabledIT_CC1, LL_TIM_IsEnabledIT_CC2,
+	LL_TIM_IsEnabledIT_CC3, LL_TIM_IsEnabledIT_CC4,
+};
+#else
 static uint32_t(*const check_it_enabled[TIMER_MAX_CH])(TIM_TypeDef *) = {
 	LL_TIM_IsEnabledIT_CC1, LL_TIM_IsEnabledIT_CC2,
 	LL_TIM_IsEnabledIT_CC3, LL_TIM_IsEnabledIT_CC4,
 };
+#endif
 #endif
 
 /** Channel to interrupt flag clear function mapping. */
@@ -72,6 +87,8 @@ struct counter_stm32_data {
 	uint32_t guard_period;
 	atomic_t cc_int_pending;
 	uint32_t freq;
+	/* Reset controller device configuration */
+	const struct reset_dt_spec reset;
 };
 
 struct counter_stm32_ch_data {
@@ -325,10 +342,13 @@ static uint32_t counter_stm32_get_pending_int(const struct device *dev)
 	switch (counter_get_num_of_channels(dev)) {
 	case 4U:
 		pending |= LL_TIM_IsActiveFlag_CC4(cfg->timer);
+		__fallthrough;
 	case 3U:
 		pending |= LL_TIM_IsActiveFlag_CC3(cfg->timer);
+		__fallthrough;
 	case 2U:
 		pending |= LL_TIM_IsActiveFlag_CC2(cfg->timer);
+		__fallthrough;
 	case 1U:
 		pending |= LL_TIM_IsActiveFlag_CC1(cfg->timer);
 	}
@@ -353,6 +373,10 @@ static int counter_stm32_get_tim_clk(const struct stm32_pclken *pclken, uint32_t
 	uint32_t bus_clk, apb_psc;
 
 	clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+
+	if (!device_is_ready(clk)) {
+		return -ENODEV;
+	}
 
 	r = clock_control_get_rate(clk, (clock_control_subsys_t *)pclken,
 				   &bus_clk);
@@ -451,6 +475,14 @@ static int counter_stm32_init_timer(const struct device *dev)
 		return r;
 	}
 	data->freq = tim_clk / (cfg->prescaler + 1U);
+
+	if (!device_is_ready(data->reset.dev)) {
+		LOG_ERR("reset controller not ready");
+		return -ENODEV;
+	}
+
+	/* Reset timer to default state using RCC */
+	reset_line_toggle_dt(&data->reset);
 
 	/* config/enable IRQ */
 	cfg->irq_config_func(dev);
@@ -567,10 +599,13 @@ void counter_stm32_irq_handler(const struct device *dev)
 	switch (counter_get_num_of_channels(dev)) {
 	case 4U:
 		TIM_IRQ_HANDLE_CC(timer, 4);
+		__fallthrough;
 	case 3U:
 		TIM_IRQ_HANDLE_CC(timer, 3);
+		__fallthrough;
 	case 2U:
 		TIM_IRQ_HANDLE_CC(timer, 2);
+		__fallthrough;
 	case 1U:
 		TIM_IRQ_HANDLE_CC(timer, 1);
 	}
@@ -593,7 +628,9 @@ void counter_stm32_irq_handler(const struct device *dev)
 	BUILD_ASSERT(NUM_CH(TIM(idx)) <= TIMER_MAX_CH,				  \
 		     "TIMER too many channels");				  \
 										  \
-	static struct counter_stm32_data counter##idx##_data;			  \
+	static struct counter_stm32_data counter##idx##_data = {		  \
+		.reset = RESET_DT_SPEC_GET(TIMER(idx)),				  \
+	};									  \
 	static struct counter_stm32_ch_data counter##idx##_ch_data[TIMER_MAX_CH]; \
 										  \
 	static void counter_##idx##_stm32_irq_config(const struct device *dev)	  \

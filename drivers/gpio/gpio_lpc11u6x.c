@@ -18,10 +18,11 @@
 
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/irq.h>
 
 #include <soc.h>
 
-#include "gpio_utils.h"
+#include <zephyr/drivers/gpio/gpio_utils.h>
 
 /* Offset from syscon base address. */
 #define LPC11U6X_PINTSEL_REGS	0x178
@@ -523,6 +524,10 @@ static int gpio_lpc11u6x_init(const struct device *dev)
 	/* Initialize shared resources only once. */
 	if (gpio_ready) {
 		return 0;
+	}
+
+	if (!device_is_ready(config->shared->clock_dev)) {
+		return -ENODEV;
 	}
 
 	/* Enable GPIO and PINT clocks. */

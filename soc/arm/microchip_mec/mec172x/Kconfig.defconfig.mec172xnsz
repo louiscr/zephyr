@@ -15,20 +15,12 @@ config PINMUX_XEC
 	default y
 	depends on PINMUX
 
-config ADC_XEC_V2
-	default y
-	depends on ADC
-
-config I2C_XEC_V2
-	default y
-	depends on I2C
-
 config ESPI_XEC_V2
 	default y
 	depends on ESPI
 
-config PECI_XEC
+config EEPROM_XEC
 	default y
-	depends on PECI
+	depends on EEPROM
 
 endif # SOC_MEC172X_NSZ

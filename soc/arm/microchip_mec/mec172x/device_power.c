@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/pm/pm.h>
@@ -19,7 +19,7 @@
 #define ECS_XEC_REG_BASE						\
 	((struct ecs_regs *)(DT_REG_ADDR(DT_NODELABEL(ecs))))
 #define PECI_XEC_REG_BASE						\
-	((struct peci_regs *)(DT_REG_ADDR(DT_NODELABEL(pcr))))
+	((struct peci_regs *)(DT_REG_ADDR(DT_NODELABEL(peci0))))
 #define PCR_XEC_REG_BASE						\
 	((struct pcr_regs *)(DT_REG_ADDR(DT_NODELABEL(pcr))))
 #define TFDP_0_XEC_REG_BASE						\

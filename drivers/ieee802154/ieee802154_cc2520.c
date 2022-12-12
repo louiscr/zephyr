@@ -616,8 +616,8 @@ static void cc2520_rx(void *arg)
 			goto flush;
 		}
 
-		pkt = net_pkt_alloc_with_buffer(cc2520->iface, pkt_len,
-						AF_UNSPEC, 0, K_NO_WAIT);
+		pkt = net_pkt_rx_alloc_with_buffer(cc2520->iface, pkt_len,
+						   AF_UNSPEC, 0, K_NO_WAIT);
 		if (!pkt) {
 			LOG_ERR("No pkt available");
 			goto flush;
@@ -989,7 +989,7 @@ static int cc2520_init(const struct device *dev)
 		return -EIO;
 	}
 
-	if (!spi_is_ready(&cfg->bus)) {
+	if (!spi_is_ready_dt(&cfg->bus)) {
 		LOG_ERR("SPI bus %s not ready", cfg->bus.bus->name);
 		return -EIO;
 	}
@@ -1385,7 +1385,7 @@ struct crypto_driver_api cc2520_crypto_api = {
 	.cipher_async_callback_set	= NULL
 };
 
-DEVICE_DEFINE(cc2520_crypto, CONFIG_IEEE802154_CC2520_CRYPTO_DRV_NAME,
+DEVICE_DEFINE(cc2520_crypto, "cc2520_crypto",
 		cc2520_crypto_init, NULL,
 		&cc2520_context_data, NULL, POST_KERNEL,
 		CONFIG_IEEE802154_CC2520_CRYPTO_INIT_PRIO, &cc2520_crypto_api);

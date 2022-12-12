@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 
 #include <zephyr/sys/byteorder.h>
 
@@ -44,9 +44,8 @@
 #include "ull_adv_internal.h"
 #include "ull_conn_internal.h"
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
-#define LOG_MODULE_NAME bt_ctlr_ull_sched
-#include "common/log.h"
+#include <zephyr/bluetooth/hci.h>
+
 #include "hal/debug.h"
 
 #if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
@@ -58,11 +57,11 @@ static void win_offset_calc(struct ll_conn *conn_curr, uint8_t is_select,
 #endif
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
-#if defined(CONFIG_BT_CONN)
+#if defined(CONFIG_BT_CONN) && (defined(CONFIG_BT_CENTRAL) || defined(CONFIG_BT_LL_SW_LLCP_LEGACY))
 static void after_cen_offset_get(uint16_t conn_interval, uint32_t ticks_slot,
 				 uint32_t ticks_anchor,
 				 uint32_t *win_offset_us);
-#endif /* CONFIG_BT_CONN */
+#endif /* CONFIG_BT_CONN && (CONFIG_BT_CENTRAL || CONFIG_BT_LL_SW_LLCP_LEGACY) */
 
 typedef struct ull_hdr *(*ull_hdr_get_func)(uint8_t ticker_id,
 					    uint32_t *ticks_slot);
@@ -595,6 +594,7 @@ static void win_offset_calc(struct ll_conn *conn_curr, uint8_t is_select,
 #endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
+#if defined(CONFIG_BT_CENTRAL) || defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 static void after_cen_offset_get(uint16_t conn_interval, uint32_t ticks_slot,
 				 uint32_t ticks_anchor,
 				 uint32_t *win_offset_us)
@@ -633,6 +633,7 @@ static void after_cen_offset_get(uint16_t conn_interval, uint32_t ticks_slot,
 		}
 	}
 }
+#endif /* CONFIG_BT_CENTRAL || CONFIG_BT_LL_SW_LLCP_LEGACY */
 #endif /* CONFIG_BT_CONN */
 
 static uint8_t after_match_slot_get(uint8_t user_id, uint32_t ticks_slot_abs,
@@ -686,7 +687,7 @@ static uint8_t after_match_slot_get(uint8_t user_id, uint32_t ticks_slot_abs,
 #if defined(CONFIG_BT_TICKER_NEXT_SLOT_GET_MATCH)
 		ret = ticker_next_slot_get_ext(TICKER_INSTANCE_ID_CTLR, user_id,
 					       &ticker_id, ticks_anchor,
-					       &ticks_to_expire,
+					       &ticks_to_expire, NULL,
 					       NULL, /* lazy */
 					       ticker_match_op_cb,
 					       NULL, /* match_op_context */
@@ -874,7 +875,10 @@ static struct ull_hdr *ull_hdr_get_cb(uint8_t ticker_id, uint32_t *ticks_slot)
 
 		conn = ll_conn_get(ticker_id - TICKER_ID_CONN_BASE);
 		if (conn && !conn->lll.role) {
-			*ticks_slot = conn->ull.ticks_slot;
+			*ticks_slot =
+				MAX(conn->ull.ticks_slot,
+				    HAL_TICKER_US_TO_TICKS(
+					    CONFIG_BT_CTLR_CENTRAL_SPACING));
 
 			return &conn->ull;
 		}

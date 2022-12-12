@@ -68,6 +68,8 @@ source "drivers/adc/Kconfig.npcx"
 
 source "drivers/adc/Kconfig.cc32xx"
 
+source "drivers/adc/Kconfig.cc13xx_cc26xx"
+
 source "drivers/adc/Kconfig.adc_emul"
 
 source "drivers/adc/Kconfig.test"
@@ -77,4 +79,7 @@ source "drivers/adc/Kconfig.ads1x1x"
 source "drivers/adc/Kconfig.gd32"
 
 source "drivers/adc/Kconfig.ads1119"
+
+source "drivers/adc/Kconfig.rpi_pico"
+
 endif # ADC

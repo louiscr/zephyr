@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/types.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 #include "kconfig.h"
 
 #include <zephyr/bluetooth/hci.h>
@@ -203,9 +203,6 @@ static void test_cc_create_periph_rem_host_accept(void)
 
 	/* Done */
 	event_done(&conn);
-
-	/* There should NOT be a host notification */
-	ut_rx_q_is_empty();
 
 	/* Prepare */
 	event_prepare(&conn);

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
-#include <ztest.h>
-#include <tc_util.h>
+#include <zephyr/kernel.h>
+#include <zephyr/ztest.h>
+#include <zephyr/tc_util.h>
 
 #include <kernel_internal.h>
 #if defined(__GNUC__)
@@ -24,11 +24,11 @@ extern uint8_t z_x86_nmi_stack3[];
 
 uint8_t *nmi_stacks[] = {
 	z_x86_nmi_stack,
-#if CONFIG_MP_NUM_CPUS > 1
+#if CONFIG_MP_MAX_NUM_CPUS > 1
 	z_x86_nmi_stack1,
-#if CONFIG_MP_NUM_CPUS > 2
+#if CONFIG_MP_MAX_NUM_CPUS > 2
 	z_x86_nmi_stack2,
-#if CONFIG_MP_NUM_CPUS > 3
+#if CONFIG_MP_MAX_NUM_CPUS > 3
 	z_x86_nmi_stack3
 #endif
 #endif

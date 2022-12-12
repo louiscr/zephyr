@@ -42,9 +42,6 @@
 #include "ull_llcp_internal.h"
 #include "ull_conn_internal.h"
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
-#define LOG_MODULE_NAME bt_ctlr_ull_llcp_phy
-#include "common/log.h"
 #include <soc.h>
 #include "hal/debug.h"
 
@@ -301,7 +298,9 @@ static uint8_t pu_update_eff_times(struct ll_conn *conn, struct proc_ctx *ctx)
 	}
 
 	if ((eff_tx_time > lll->dle.eff.max_tx_time) ||
-	    (eff_rx_time > lll->dle.eff.max_rx_time)) {
+	    (lll->dle.eff.max_tx_time > max_tx_time) ||
+	    (eff_rx_time > lll->dle.eff.max_rx_time) ||
+	    (lll->dle.eff.max_rx_time > max_rx_time)) {
 		lll->dle.eff.max_tx_time = eff_tx_time;
 		lll->dle.eff.max_rx_time = eff_rx_time;
 		return 1U;
@@ -424,8 +423,7 @@ static void pu_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
 	pdu->tx = conn->lll.phy_tx;
 
 	/* Enqueue notification towards LL */
-	ll_rx_put(ntf->hdr.link, ntf);
-	ll_rx_sched();
+	ll_rx_put_sched(ntf->hdr.link, ntf);
 	ctx->data.pu.ntf_pu = 0;
 }
 
@@ -446,8 +444,7 @@ static void pu_dle_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
 	llcp_ntf_encode_length_change(conn, pdu);
 
 	/* Enqueue notification towards LL */
-	ll_rx_put(ntf->hdr.link, ntf);
-	ll_rx_sched();
+	ll_rx_put_sched(ntf->hdr.link, ntf);
 }
 #endif
 
@@ -726,6 +723,18 @@ static void lp_pu_st_wait_rx_phy_update_ind(struct ll_conn *conn, struct proc_ct
 		ctx->data.pu.ntf_pu = 1;
 		lp_pu_complete(conn, ctx, evt, param);
 		llcp_tx_resume_data(conn, LLCP_TX_QUEUE_PAUSE_DATA_PHY_UPDATE);
+		break;
+	case LP_PU_EVT_UNKNOWN:
+		llcp_rr_set_incompat(conn, INCOMPAT_NO_COLLISION);
+		/* Unsupported in peer, so disable locally for this connection
+		 * Peer does not accept PHY UPDATE, so disable non 1M phys on current connection
+		 */
+		feature_unmask_features(conn, LL_FEAT_BIT_PHY_2M | LL_FEAT_BIT_PHY_CODED);
+		ctx->data.pu.error = BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
+		ctx->data.pu.ntf_pu = 1;
+		lp_pu_complete(conn, ctx, evt, param);
+		llcp_tx_resume_data(conn, LLCP_TX_QUEUE_PAUSE_DATA_PHY_UPDATE);
+		break;
 	default:
 		/* Ignore other evts */
 		break;

@@ -303,6 +303,11 @@ int pwm_led_esp32_init(const struct device *dev)
 	const struct pwm_ledc_esp32_config *config = dev->config;
 	struct pwm_ledc_esp32_data *data = (struct pwm_ledc_esp32_data *const)(dev)->data;
 
+	if (!device_is_ready(config->clock_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
 	/* Enable peripheral */
 	clock_control_on(config->clock_dev, config->clock_subsys);
 
@@ -350,5 +355,5 @@ DEVICE_DT_INST_DEFINE(0, &pwm_led_esp32_init, NULL,
 			&pwm_ledc_esp32_data,
 			&pwm_ledc_esp32_config,
 			POST_KERNEL,
-			CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
+			CONFIG_PWM_INIT_PRIORITY,
 			&pwm_led_esp32_api);

@@ -17,9 +17,9 @@
  *   -# Data is transferred correctly from src to dest
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/drivers/dma.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 #define TEST_DMA_CHANNEL_0 (0)
 #define TEST_DMA_CHANNEL_1 (1)
@@ -53,7 +53,7 @@ static int test_task(int minor, int major)
 {
 	struct dma_config dma_cfg = { 0 };
 	struct dma_block_config dma_block_cfg = { 0 };
-	const struct device *dma = DEVICE_DT_GET(DT_NODELABEL(dma0));
+	const struct device *const dma = DEVICE_DT_GET(DT_NODELABEL(dma0));
 
 	if (!device_is_ready(dma)) {
 		TC_PRINT("dma controller device is not ready\n");
@@ -139,17 +139,17 @@ static int test_task(int minor, int major)
 }
 
 /* export test cases */
-void test_dma_m2m_chan0_1_major_link(void)
+ZTEST(dma_m2m_link, test_dma_m2m_chan0_1_major_link)
 {
-	zassert_true((test_task(0, 1) == TC_PASS), NULL);
+	zassert_true((test_task(0, 1) == TC_PASS));
 }
 
-void test_dma_m2m_chan0_1_minor_link(void)
+ZTEST(dma_m2m_link, test_dma_m2m_chan0_1_minor_link)
 {
-	zassert_true((test_task(1, 0) == TC_PASS), NULL);
+	zassert_true((test_task(1, 0) == TC_PASS));
 }
 
-void test_dma_m2m_chan0_1_minor_major_link(void)
+ZTEST(dma_m2m_link, test_dma_m2m_chan0_1_minor_major_link)
 {
-	zassert_true((test_task(1, 1) == TC_PASS), NULL);
+	zassert_true((test_task(1, 1) == TC_PASS));
 }

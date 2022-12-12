@@ -8,6 +8,7 @@
 
 #include <hal/mcpwm_hal.h>
 #include <hal/mcpwm_ll.h>
+#include "driver/mcpwm.h"
 
 #include <soc.h>
 #include <errno.h>
@@ -413,6 +414,11 @@ int mcpwm_esp32_init(const struct device *dev)
 	struct mcpwm_esp32_data *data = (struct mcpwm_esp32_data *const)(dev)->data;
 	struct mcpwm_esp32_channel_config *channel;
 
+	if (!device_is_ready(config->clock_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
 	/* Enable peripheral */
 	ret = clock_control_on(config->clock_dev, config->clock_subsys);
 	if (ret < 0) {
@@ -562,6 +568,6 @@ static const struct pwm_driver_api mcpwm_esp32_api = {
                                                                                                    \
 	DEVICE_DT_INST_DEFINE(idx, &mcpwm_esp32_init, NULL, &mcpwm_esp32_data_##idx,               \
 			      &mcpwm_esp32_config_##idx, POST_KERNEL,                              \
-			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &mcpwm_esp32_api);
+			      CONFIG_PWM_INIT_PRIORITY, &mcpwm_esp32_api);
 
 DT_INST_FOREACH_STATUS_OKAY(ESP32_MCPWM_INIT)

@@ -72,7 +72,7 @@ What the build system does with bindings
 ========================================
 
 The build system uses bindings both to validate devicetree nodes and to convert
-the devicetree's contents into the generated :ref:`devicetree_unfixed.h
+the devicetree's contents into the generated :ref:`devicetree_generated.h
 <dt-outputs>` header file.
 
 For example, the build system would use the above binding to check that the
@@ -298,10 +298,6 @@ For example, a binding for a UART peripheral might look something like this:
        type: int
        description: current baud rate
        required: true
-     label:
-       type: string
-       description: human-readable name
-       required: false
 
 The properties in the following node would be validated by the above binding:
 
@@ -311,7 +307,6 @@ The properties in the following node would be validated by the above binding:
    	compatible = "manufacturer,serial";
    	reg = <0xdeadbeef 0x1000>;
    	current-speed = <115200>;
-        label = "UART_0";
    };
 
 This is used to check that required properties appear, and to control the
@@ -341,14 +336,12 @@ Here are some more examples.
        # Describes an optional property like 'keys = "foo", "bar";'
        keys:
            type: string-array
-           required: false
            description: Keys for bar-device
 
        # Describes an optional property like 'maximum-speed = "full-speed";'
        # the enum specifies known values that the string property may take
        maximum-speed:
            type: string
-           required: false
            description: Configures USB controllers to work up to a specific speed.
            enum:
               - "low-speed"
@@ -360,7 +353,6 @@ Here are some more examples.
        # the enum specifies known values that the int property may take
        resolution:
          type: int
-         required: false
          enum:
           - 8
           - 16
@@ -376,28 +368,23 @@ Here are some more examples.
 
        int-with-default:
            type: int
-           required: false
            default: 123
            description: Value for int register, default is power-up configuration.
 
        array-with-default:
            type: array
-           required: false
            default: [1, 2, 3] # Same as 'array-with-default = <1 2 3>'
 
        string-with-default:
            type: string
-           required: false
            default: "foo"
 
        string-array-with-default:
            type: string-array
-           required: false
            default: ["foo", "bar"] # Same as 'string-array-with-default = "foo", "bar"'
 
        uint8-array-with-default:
            type: uint8-array
-           required: false
            default: [0x12, 0x34] # Same as 'uint8-array-with-default = [12 34]'
 
 Property entry syntax
@@ -420,13 +407,17 @@ this:
        - <item2>
        ...
        - <itemN>
-     const: <string | int>
+     const: <string | int | array | uint8-array | string-array>
 
 Required properties
 +++++++++++++++++++
 
 If a node matches a binding but is missing any property which the binding
 defines with ``required: true``, the build fails.
+
+Note: A property is implicitly optional unless ``required: true`` is
+specified. Using ``required: false`` is therefore redundant and strongly
+discouraged.
 
 Property types
 ++++++++++++++
@@ -445,7 +436,7 @@ for more details about writing values of each type in a DTS file.
 
    * - ``string``
      - exactly one string
-     - ``label = "UART_0";``
+     - ``status = "disabled";``
 
    * - ``int``
      - exactly one 32-bit value (cell)
@@ -519,8 +510,7 @@ If property ``foo`` is missing in a matching node, then the output will be as
 if ``foo = <3>;`` had appeared in the DTS (except YAML data types are used for
 the default value).
 
-Note that it only makes sense to combine ``default:`` with ``required: false``.
-Combining it with ``required: true`` will raise an error.
+Note that combining ``default:`` with ``required: true`` will raise an error.
 
 For rules related to ``default`` in upstream Zephyr bindings, see
 :ref:`dt-bindings-default-rules`.
@@ -630,6 +620,15 @@ children of any node matching this binding appear on this type of bus.
 This in turn influences the way ``on-bus:`` is used to match bindings for the
 child nodes.
 
+For a single bus supporting multiple protocols, e.g. I3C and I2C, the ``bus:``
+in the binding can have a list as value:
+
+.. code-block:: YAML
+
+   compatible: "manufacturer,i3c-controller"
+   bus: [i3c, i2c]
+   # ...
+
 .. _dt-bindings-on-bus:
 
 On-bus
@@ -701,7 +700,6 @@ nodes, even though they have the same compatible:
    properties:
      uses-clock-stretching:
        type: boolean
-       required: false
    on-bus: i2c
 
 Only ``sensor@79`` can have a ``use-clock-stretching`` property. The
@@ -821,7 +819,17 @@ included into this binding.
 
 Included files are merged into bindings with a simple recursive dictionary
 merge. The build system will check that the resulting merged binding is
-well-formed.
+well-formed. It is allowed to include at any level, including ``child-binding``,
+like this:
+
+.. code-block:: YAML
+
+   # foo.yaml will be merged with content at this level
+   include: foo.yaml
+
+   child-binding:
+     # bar.yaml will be merged with content at this level
+     include: bar.yaml
 
 It is an error if a key appears with a different value in a binding and in a
 file it includes, with one exception: a binding can have ``required: true`` for

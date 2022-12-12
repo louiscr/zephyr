@@ -9,6 +9,12 @@ Overview
 LoRaWAN development kit based on Olimex BB-STM32WL module using the
 STM32WLE5CCU6 MCU.
 
+.. figure:: olimex-stm32wl-devkit.jpg
+     :align: center
+     :alt: Olimex LoRa STM32WL DevKit
+
+     Olimex LoRa STM32WL DevKit (credit: OLIMEX)
+
 Hardware
 ********
 
@@ -17,7 +23,7 @@ The board has below hardware features:
 - BB-STM32WL, 256KB Flash, 64KB RAM with external antenna
 - Lithium battery connector 3V (does not include battery)
 - UEXT connector for external sensors
-- BMA280 temperature, humidity, pressure sensor
+- BME280 temperature, humidity, pressure sensor
 - LDR resistor for lighting measurement
 - IIS2MDCTR 3-axis magnetometer for smart parking
 - GPIO connector for prototyping

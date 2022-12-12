@@ -11,7 +11,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(eth_w5500, CONFIG_ETHERNET_LOG_LEVEL);
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <string.h>
 #include <errno.h>
@@ -473,7 +473,7 @@ static int w5500_init(const struct device *dev)
 	const struct w5500_config *config = dev->config;
 	struct w5500_runtime *ctx = dev->data;
 
-	if (!spi_is_ready(&config->spi)) {
+	if (!spi_is_ready_dt(&config->spi)) {
 		LOG_ERR("SPI master port %s not ready", config->spi.bus->name);
 		return -EINVAL;
 	}
@@ -509,7 +509,6 @@ static int w5500_init(const struct device *dev)
 		}
 		gpio_pin_set_dt(&config->reset, 0);
 		k_usleep(500);
-		gpio_pin_set_dt(&config->reset, 1);
 	}
 
 	err = w5500_hw_reset(dev);

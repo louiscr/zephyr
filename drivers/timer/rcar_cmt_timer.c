@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/arch/cpu.h>
 #include <zephyr/device.h>
 #include <soc.h>
 #include <zephyr/drivers/timer/system_timer.h>
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/renesas_cpg_mssr.h>
+#include <zephyr/irq.h>
 
 #define DT_DRV_COMPAT renesas_rcar_cmt
 
@@ -95,7 +97,7 @@ static int sys_clock_driver_init(const struct device *dev)
 
 	ARG_UNUSED(dev);
 	clk = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(0));
-	if (clk == NULL) {
+	if (!device_is_ready(clk)) {
 		return -ENODEV;
 	}
 

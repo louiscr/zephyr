@@ -52,8 +52,7 @@ enum bt_audio_context {
 	BT_AUDIO_CONTEXT_TYPE_EMERGENCY_ALARM = BIT(11),
 };
 
-/** @def BT_AUDIO_CONTEXT_TYPE_ANY
- *
+/**
  * Any known context.
  */
 #define BT_AUDIO_CONTEXT_TYPE_ANY	 (BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED | \
@@ -174,10 +173,12 @@ struct bt_audio_broadcast_source;
 /** @brief Codec configuration structure */
 struct bt_codec_data {
 	struct bt_data data;
+#if defined(CONFIG_BT_CODEC_MAX_DATA_LEN)
 	uint8_t  value[CONFIG_BT_CODEC_MAX_DATA_LEN];
+#endif /* CONFIG_BT_CODEC_MAX_DATA_LEN */
 };
 
-/** @def BT_CODEC_DATA
+/**
  *  @brief Helper to declare elements of bt_codec_data arrays
  *
  *  This macro is mainly for creating an array of struct bt_codec_data
@@ -193,7 +194,7 @@ struct bt_codec_data {
 				sizeof((uint8_t []) { _bytes })) \
 	}
 
-/** @def BT_CODEC
+/**
  *  @brief Helper to declare bt_codec structure
  *
  *  @param _id Codec ID
@@ -204,6 +205,8 @@ struct bt_codec_data {
  */
 #define BT_CODEC(_id, _cid, _vid, _data, _meta) \
 	{ \
+		/* Use HCI data path as default, can be overwritten by application */ \
+		.path_id = BT_ISO_DATA_PATH_HCI, \
 		.id = _id, \
 		.cid = _cid, \
 		.vid = _vid, \
@@ -250,25 +253,36 @@ enum bt_audio_location {
 
 /** @brief Codec structure. */
 struct bt_codec {
+	/** Data path ID
+	 *
+	 * @ref BT_ISO_DATA_PATH_HCI for HCI path, or any other value for
+	 * vendor specific ID.
+	 */
+	uint8_t path_id;
 	/** Codec ID */
 	uint8_t  id;
 	/** Codec Company ID */
 	uint16_t cid;
 	/** Codec Company Vendor ID */
 	uint16_t vid;
+#if defined(CONFIG_BT_CODEC_MAX_DATA_COUNT)
 	/** Codec Specific Data count */
 	size_t   data_count;
 	/** Codec Specific Data */
 	struct bt_codec_data data[CONFIG_BT_CODEC_MAX_DATA_COUNT];
+#endif /* CONFIG_BT_CODEC_MAX_DATA_COUNT */
+#if defined(CONFIG_BT_CODEC_MAX_METADATA_COUNT)
 	/** Codec Specific Metadata count */
 	size_t   meta_count;
 	/** Codec Specific Metadata */
 	struct bt_codec_data meta[CONFIG_BT_CODEC_MAX_METADATA_COUNT];
+#endif /* CONFIG_BT_CODEC_MAX_METADATA_COUNT */
 };
 
 struct bt_audio_base_bis_data {
 	/* Unique index of the BIS */
 	uint8_t index;
+#if defined(CONFIG_BT_CODEC_MAX_DATA_COUNT)
 	/** Codec Specific Data count.
 	 *
 	 *  Only valid if the data_count of struct bt_codec in the subgroup is 0
@@ -279,6 +293,7 @@ struct bt_audio_base_bis_data {
 	 *  Only valid if the data_count of struct bt_codec in the subgroup is 0
 	 */
 	struct bt_codec_data data[CONFIG_BT_CODEC_MAX_DATA_COUNT];
+#endif /* CONFIG_BT_CODEC_MAX_DATA_COUNT */
 };
 
 struct bt_audio_base_subgroup {
@@ -307,7 +322,7 @@ enum bt_audio_dir {
 	BT_AUDIO_DIR_SOURCE = 0x02,
 };
 
-/** @def BT_CODEC_QOS
+/**
  *  @brief Helper to declare elements of bt_codec_qos
  *
  *  @param _interval SDU interval (usec)
@@ -343,7 +358,7 @@ enum {
 	BT_CODEC_QOS_CODED = BIT(2),
 };
 
-/** @def BT_CODEC_QOS_UNFRAMED
+/**
  *  @brief Helper to declare Input Unframed bt_codec_qos
  *
  *  @param _interval SDU interval (usec)
@@ -356,7 +371,7 @@ enum {
 	BT_CODEC_QOS(_interval, BT_CODEC_QOS_UNFRAMED, BT_CODEC_QOS_2M, _sdu, \
 		     _rtn, _latency, _pd)
 
-/** @def BT_CODEC_QOS_FRAMED
+/**
  *  @brief Helper to declare Input Framed bt_codec_qos
  *
  *  @param _interval SDU interval (usec)
@@ -392,7 +407,7 @@ struct bt_codec_qos {
 	uint32_t pd;
 };
 
-/** @def BT_CODEC_QOS_PREF
+/**
  *  @brief Helper to declare elements of @ref bt_codec_qos_pref
  *
  *  @param _unframed_supported Unframed PDUs supported
@@ -473,7 +488,7 @@ struct bt_audio_lc3_preset {
 
 /* LC3 Unicast presets defined by table 5.2 in the BAP v1.0 specification */
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_8_1_1
+/**
  *  @brief Helper to declare LC3 Unicast 8_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -485,7 +500,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(26u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_8_2_1
+/**
  *  @brief Helper to declare LC3 Unicast 8_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -497,7 +512,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(30u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_16_1_1
+/**
  *  @brief Helper to declare LC3 Unicast 16_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -509,7 +524,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(30u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_16_2_1
+/**
  *  @brief Helper to declare LC3 Unicast 16_2_1 codec configuration
  *
  *  Mandatory to support as both unicast client and server
@@ -523,7 +538,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(40u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_24_1_1
+/**
  *  @brief Helper to declare LC3 Unicast 24_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -535,7 +550,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(45u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_24_2_1
+/**
  *  @brief Helper to declare LC3 Unicast 24_2_1 codec configuration
  *
  *  Mandatory to support as unicast server
@@ -549,7 +564,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(60u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_32_1_1
+/**
  *  @brief Helper to declare LC3 Unicast 32_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -561,7 +576,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(60u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_32_2_1
+/**
  *  @brief Helper to declare LC3 Unicast 32_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -573,7 +588,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(80u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_441_1_1
+/**
  *  @brief Helper to declare LC3 Unicast 441_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -586,7 +601,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 97u, 5u, 24u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_441_2_1
+/**
  *  @brief Helper to declare LC3 Unicast 441_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -599,7 +614,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 130u, 5u, 31u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_1_1
+/**
  *  @brief Helper to declare LC3 Unicast 48_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -611,7 +626,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(75u, 5u, 15u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_2_1
+/**
  *  @brief Helper to declare LC3 Unicast 48_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -623,7 +638,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(100u, 5u, 20u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_3_1
+/**
  *  @brief Helper to declare LC3 Unicast 48_3_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -635,7 +650,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(90u, 5u, 15u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_4_1
+/**
  *  @brief Helper to declare LC3 Unicast 48_4_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -647,7 +662,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(120u, 5u, 20u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_5_1
+/**
  *  @brief Helper to declare LC3 Unicast 8_5_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -659,7 +674,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(117u, 5u, 15u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_6_1
+/**
  *  @brief Helper to declare LC3 Unicast 48_6_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -671,7 +686,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(155u, 5u, 20u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_8_1_2
+/**
  *  @brief Helper to declare LC3 Unicast 8_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -684,7 +699,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(26u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_8_2_2
+/**
  *  @brief Helper to declare LC3 Unicast 8_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -696,7 +711,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(30u, 13u, 95u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_16_1_2
+/**
  *  @brief Helper to declare LC3 Unicast 16_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -708,7 +723,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(30u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_16_2_2
+/**
  *  @brief Helper to declare LC3 Unicast 16_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -720,7 +735,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(40u, 13u, 95u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_24_1_2
+/**
  *  @brief Helper to declare LC3 Unicast 24_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -732,7 +747,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(45u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_24_2_2
+/**
  *  @brief Helper to declare LC3 Unicast 24_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -744,7 +759,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(60u, 13u, 95u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_32_1_2
+/**
  *  @brief Helper to declare LC3 Unicast 32_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -756,7 +771,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(60u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_32_2_2
+/**
  *  @brief Helper to declare LC3 Unicast 32_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -768,7 +783,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(80u, 13u, 95u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_441_1_2
+/**
  *  @brief Helper to declare LC3 Unicast 441_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -781,7 +796,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 97u, 13u, 80u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_441_2_2
+/**
  *  @brief Helper to declare LC3 Unicast 441_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -794,7 +809,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 130u, 13u, 85u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_1_2
+/**
  *  @brief Helper to declare LC3 Unicast 48_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -806,7 +821,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(75u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_2_2
+/**
  *  @brief Helper to declare LC3 Unicast 48_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -818,7 +833,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(100u, 13u, 95u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_3_2
+/**
  *  @brief Helper to declare LC3 Unicast 48_3_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -830,7 +845,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(90u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_4_2
+/**
  *  @brief Helper to declare LC3 Unicast 48_4_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -842,7 +857,7 @@ struct bt_audio_lc3_preset {
 	BT_CODEC_LC3_QOS_10_UNFRAMED(120u, 13u, 100u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_5_2
+/**
  *  @brief Helper to declare LC3 Unicast 48_5_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -854,7 +869,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(117u, 13u, 75u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_UNICAST_PRESET_48_6_2
+/**
  *  @brief Helper to declare LC3 Unicast 48_6_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -866,7 +881,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(155u, 13u, 100u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_8_1_1
+/**
  *  @brief Helper to declare LC3 Broadcast 8_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -879,7 +894,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(26u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_8_2_1
+/**
  *  @brief Helper to declare LC3 Broadcast 8_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -891,7 +906,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(30u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_16_1_1
+/**
  *  @brief Helper to declare LC3 Broadcast 16_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -903,7 +918,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(30u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_16_2_1
+/**
  *  @brief Helper to declare LC3 Broadcast 16_2_1 codec configuration
  *
  *  Mandatory to support as both broadcast source and sink
@@ -917,7 +932,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(40u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_24_1_1
+/**
  *  @brief Helper to declare LC3 Broadcast 24_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -929,7 +944,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(45u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_24_2_1
+/**
  *  @brief Helper to declare LC3 Broadcast 24_2_1 codec configuration
  *
  *  Mandatory to support as broadcast sink
@@ -943,7 +958,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(60u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_32_1_1
+/**
  *  @brief Helper to declare LC3 Broadcast 32_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -955,7 +970,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(60u, 2u, 8u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_32_2_1
+/**
  *  @brief Helper to declare LC3 Broadcast 32_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -967,7 +982,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(80u, 2u, 10u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_441_1_1
+/**
  *  @brief Helper to declare LC3 Broadcast 441_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -980,7 +995,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 97u, 4u, 24u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_441_2_1
+/**
  *  @brief Helper to declare LC3 Broadcast 441_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -993,7 +1008,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 130u, 4u, 31u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_1_1
+/**
  *  @brief Helper to declare LC3 Broadcast 48_1_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1005,7 +1020,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(75u, 4u, 15u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_2_1
+/**
  *  @brief Helper to declare LC3 Broadcast 48_2_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1017,7 +1032,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(100u, 4u, 20u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_3_1
+/**
  *  @brief Helper to declare LC3 Broadcast 48_3_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1029,7 +1044,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(90u, 4u, 15u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_4_1
+/**
  *  @brief Helper to declare LC3 Broadcast 48_4_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1041,7 +1056,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(120u, 4u, 20u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_5_1
+/**
  *  @brief Helper to declare LC3 Broadcast 48_5_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1053,7 +1068,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(117u, 4u, 15u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_6_1
+/**
  *  @brief Helper to declare LC3 Broadcast 48_6_1 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1065,7 +1080,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(155u, 4u, 20u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_8_1_2
+/**
  *  @brief Helper to declare LC3 Broadcast 8_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1078,7 +1093,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(26u, 4u, 45u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_8_2_2
+/**
  *  @brief Helper to declare LC3 Broadcast 8_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1090,7 +1105,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(30u, 4u, 60u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_16_1_2
+/**
  *  @brief Helper to declare LC3 Broadcast 16_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1102,7 +1117,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(30u, 4u, 45u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_16_2_2
+/**
  *  @brief Helper to declare LC3 Broadcast 16_2_2 codec configuration
  *
  *  Mandatory to support as both broadcast source and sink
@@ -1116,7 +1131,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(40u, 4u, 60u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_24_1_2
+/**
  *  @brief Helper to declare LC3 Broadcast 24_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1128,7 +1143,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(45u, 4u, 45u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_24_2_2
+/**
  *  @brief Helper to declare LC3 Broadcast 24_2_2 codec configuration
  *
  *  Mandatory to support as broadcast sink
@@ -1142,7 +1157,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(60u, 4u, 60u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_32_1_2
+/**
  *  @brief Helper to declare LC3 Broadcast 32_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1154,7 +1169,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(60u, 4u, 45u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_32_2_2
+/**
  *  @brief Helper to declare LC3 Broadcast 32_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1166,7 +1181,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(80u, 4u, 60u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_441_1_2
+/**
  *  @brief Helper to declare LC3 Broadcast 441_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1179,7 +1194,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 97u, 4u, 54u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_441_2_2
+/**
  *  @brief Helper to declare LC3 Broadcast 441_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1192,7 +1207,7 @@ struct bt_audio_lc3_preset {
 			     BT_CODEC_QOS_2M, 130u, 4u, 60u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_1_2
+/**
  *  @brief Helper to declare LC3 Broadcast 48_1_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1204,7 +1219,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(75u, 4u, 50u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_2_2
+/**
  *  @brief Helper to declare LC3 Broadcast 48_2_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1216,7 +1231,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(100u, 4u, 65u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_3_2
+/**
  *  @brief Helper to declare LC3 Broadcast 48_3_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1228,7 +1243,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(90u, 4u, 50u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_4_2
+/**
  *  @brief Helper to declare LC3 Broadcast 48_4_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1240,7 +1255,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_10_UNFRAMED(120u, 4u, 65u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_5_2
+/**
  *  @brief Helper to declare LC3 Broadcast 48_5_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1252,7 +1267,7 @@ struct bt_audio_lc3_preset {
 		BT_CODEC_LC3_QOS_7_5_UNFRAMED(117u, 4u, 50u, 40000u) \
 	)
 
-/** @def BT_AUDIO_LC3_BROADCAST_PRESET_48_6_2
+/**
  *  @brief Helper to declare LC3 Broadcast 48_6_2 codec configuration
  *
  *  @param _loc             Audio channel location bitfield (@ref bt_audio_location)
@@ -1282,8 +1297,6 @@ struct bt_audio_stream {
 	const struct bt_codec *codec;
 	/** QoS Configuration */
 	struct bt_codec_qos *qos;
-	/** ISO channel reference */
-	struct bt_iso_chan *iso;
 	/** Audio stream operations */
 	struct bt_audio_stream_ops *ops;
 
@@ -1475,95 +1488,6 @@ struct bt_audio_unicast_server_cb {
 	 *  @return 0 in case of success or negative value in case of error.
 	 */
 	int (*release)(struct bt_audio_stream *stream);
-};
-
-/**  @brief Callback structure for the Public Audio Capabilities Service (PACS)
- *
- * This is used for the Unicast Server
- * (@kconfig{CONFIG_BT_AUDIO_UNICAST_SERVER}) and Broadcast Sink
- * (@kconfig{CONFIG_BT_AUDIO_BROADCAST_SINK}) roles.
- */
-struct bt_audio_pacs_cb {
-	/** @brief Get available audio contexts callback
-	 *
-	 *  Get available audio contexts callback is called whenever a remote client
-	 *  requests to read the value of Published Audio Capabilities (PAC) Available
-	 *  Audio Contexts, or if the value needs to be notified.
-	 *
-	 *  @param[in]  conn     The connection that requests the available audio
-	 *                       contexts. Will be NULL if requested for sending
-	 *                       a notification, as a result of calling
-	 *                       bt_pacs_available_contexts_changed().
-	 *  @param[in]  dir      Direction of the endpoint.
-	 *  @param[out] context  Pointer to the contexts that needs to be set.
-	 *
-	 *  @return 0 in case of success or negative value in case of error.
-	 */
-	int (*get_available_contexts)(struct bt_conn *conn, enum bt_audio_dir dir,
-				      enum bt_audio_context *context);
-
-	/** @brief Publish Capability callback
-	 *
-	 *  Publish Capability callback is called whenever a remote client
-	 *  requests to read the Published Audio Capabilities (PAC) records.
-	 *  The callback will be called iteratively until it returns an error,
-	 *  increasing the @p index each time. Once an error value (non-zero)
-	 *  is returned, the previously returned @p codec values (if any) will
-	 *  be sent to the client that requested the value.
-	 *
-	 *  @param conn   The connection that requests the capabilities.
-	 *                Will be NULL if the capabilities is requested for
-	 *                sending a notification, as a result of calling
-	 *                bt_audio_capability_register() or
-	 *                bt_audio_capability_unregister().
-	 *  @param type   Type of the endpoint.
-	 *  @param index  Index of the codec object requested. Multiple objects
-	 *                may be returned, and this value keep tracks of how
-	 *                many have previously been returned.
-	 *  @param codec  Codec object that shall be populated if returning
-	 *                success (0). Ignored if returning non-zero.
-	 *
-	 *  @return 0 in case of success or negative value in case of error.
-	 */
-	int (*publish_capability)(struct bt_conn *conn, uint8_t type,
-				  uint8_t index, struct bt_codec *const codec);
-
-#if defined(CONFIG_BT_PAC_SNK_LOC) || defined(CONFIG_BT_PAC_SRC_LOC)
-	/** @brief Publish location callback
-	 *
-	 *  Publish location callback is called whenever a remote client
-	 *  requests to read the Published Audio Capabilities (PAC) location,
-	 *  or if the location needs to be notified.
-	 *
-	 *  @param[in]  conn      The connection that requests the location.
-	 *                        Will be NULL if the location is requested
-	 *                        for sending a notification, as a result of
-	 *                        calling bt_audio_pacs_location_changed().
-	 *  @param[in]  dir       Direction of the endpoint.
-	 *  @param[out] location  Pointer to the location that needs to be set.
-	 *
-	 *  @return 0 in case of success or negative value in case of error.
-	 */
-	int (*publish_location)(struct bt_conn *conn,
-				enum bt_audio_dir dir,
-				enum bt_audio_location *location);
-
-#if defined(CONFIG_BT_PAC_SNK_LOC_WRITEABLE) || defined(CONFIG_BT_PAC_SRC_LOC_WRITEABLE)
-	/** @brief Write location callback
-	 *
-	 *  Write location callback is called whenever a remote client
-	 *  requests to write the Published Audio Capabilities (PAC) location.
-	 *
-	 *  @param conn      The connection that requests the write.
-	 *  @param dir       Direction of the endpoint.
-	 *  @param location  The location being written.
-	 *
-	 *  @return 0 in case of success or negative value in case of error.
-	 */
-	int (*write_location)(struct bt_conn *conn, enum bt_audio_dir dir,
-			      enum bt_audio_location location);
-#endif /* CONFIG_BT_PAC_SNK_LOC_WRITEABLE || CONFIG_BT_PAC_SRC_LOC_WRITEABLE */
-#endif /* CONFIG_BT_PAC_SNK_LOC || CONFIG_BT_PAC_SRC_LOC */
 };
 
 /** Broadcast Audio Sink callback structure */
@@ -1779,40 +1703,6 @@ void bt_audio_stream_cb_register(struct bt_audio_stream *stream,
  * @{
  */
 
-/** @brief Register Published Audio Capabilities Service callbacks.
- *
- *  Only one callback structure can be registered, and attempting to
- *  registering more than one will result in an error.
- *
- *  This can only be done for the Unicast Server
- *  (@kconfig{CONFIG_BT_AUDIO_UNICAST_SERVER}) and Broadcast Sink
- *  (@kconfig{CONFIG_BT_AUDIO_BROADCAST_SINK}) roles.
- *
- *  Calling bt_audio_capability_register() will implicitly register the
- *  callbacks.
- *
- *  @param cb  Unicast server callback structure.
- *
- *  @return 0 in case of success or negative value in case of error.
- */
-int bt_audio_pacs_register_cb(const struct bt_audio_pacs_cb *cb);
-
-/** @brief Notify that the location has changed
- *
- * @param dir Direction of the location changed.
- *
- * @return 0 in case of success or negative value in case of error.
- */
-int bt_audio_pacs_location_changed(enum bt_audio_dir dir);
-
-/** @brief Notify available audio contexts changed
- *
- * Notify connected clients that the available audio contexts has changed
- *
- * @return 0 in case of success or negative value in case of error.
- */
-int bt_pacs_available_contexts_changed(void);
-
 /** @brief Register unicast server callbacks.
  *
  *  Only one callback structure can be registered, and attempting to
@@ -2017,11 +1907,10 @@ int bt_audio_stream_stop(struct bt_audio_stream *stream);
  *  bt_audio_broadcast_source_delete().
  *
  *  @param stream Stream object
- *  @param cache True to cache the codec configuration or false to forget it
  *
  *  @return 0 in case of success or negative value in case of error.
  */
-int bt_audio_stream_release(struct bt_audio_stream *stream, bool cache);
+int bt_audio_stream_release(struct bt_audio_stream *stream);
 
 /** @brief Send data to Audio stream
  *
@@ -2044,7 +1933,7 @@ int bt_audio_stream_release(struct bt_audio_stream *stream, bool cache);
  *  @return Bytes sent in case of success or negative value in case of error.
  */
 int bt_audio_stream_send(struct bt_audio_stream *stream, struct net_buf *buf,
-			 uint32_t seq_num, uint32_t ts);
+			 uint16_t seq_num, uint32_t ts);
 
 /** @brief Parameter struct for the unicast group functions
  *
@@ -2129,6 +2018,42 @@ int bt_audio_unicast_group_delete(struct bt_audio_unicast_group *unicast_group);
  * @{
  */
 
+struct bt_audio_broadcast_source_stream_param {
+	/** Audio stream */
+	struct bt_audio_stream *stream;
+
+	/** The number of elements in the @p data array.
+	 *
+	 * The BIS specific data may be omitted and this set to 0.
+	 */
+	size_t data_count;
+
+	/** BIS Codec Specific Configuration */
+	struct bt_codec_data *data;
+};
+
+struct bt_audio_broadcast_source_subgroup_param {
+	/** The number of parameters in @p stream_params */
+	size_t params_count;
+
+	/** Array of stream parameters */
+	struct bt_audio_broadcast_source_stream_param *params;
+
+	/** Subgroup Codec configuration. */
+	struct bt_codec *codec;
+};
+
+struct bt_audio_broadcast_source_create_param {
+	/** The number of parameters in @p subgroup_params */
+	size_t params_count;
+
+	/** Array of stream parameters */
+	struct bt_audio_broadcast_source_subgroup_param *params;
+
+	/** Quality of Service configuration. */
+	struct bt_codec_qos *qos;
+};
+
 /** @brief Create audio broadcast source.
  *
  *  Create a new audio broadcast source with one or more audio streams.
@@ -2140,19 +2065,13 @@ int bt_audio_unicast_group_delete(struct bt_audio_unicast_group *unicast_group);
  *  called and no audio information (BIGInfo) will be visible to scanners
  *  (see bt_le_per_adv_sync_cb).
  *
- *  @param[in]  streams     Array of stream object pointers being used for the
- *                          broadcaster.
- *  @param[in]  num_stream  Number of streams in @p streams.
- *  @param[in]  codec       Codec configuration.
- *  @param[in]  qos         Quality of Service configuration
+ *  @param[in]  param       Pointer to parameters used to create the broadcast
+ *                          source.
  *  @param[out] source      Pointer to the broadcast source created
  *
  *  @return Zero on success or (negative) error code otherwise.
  */
-int bt_audio_broadcast_source_create(struct bt_audio_stream *streams[],
-				     size_t num_stream,
-				     struct bt_codec *codec,
-				     struct bt_codec_qos *qos,
+int bt_audio_broadcast_source_create(struct bt_audio_broadcast_source_create_param *param,
 				     struct bt_audio_broadcast_source **source);
 
 /** @brief Reconfigure audio broadcast source.
@@ -2177,10 +2096,13 @@ int bt_audio_broadcast_source_reconfig(struct bt_audio_broadcast_source *source,
  *  be streamed.
  *
  *  @param source      Pointer to the broadcast source
+ *  @param adv         Pointer to an extended advertising set with periodic
+ *                     advertising configured.
  *
  *  @return Zero on success or (negative) error code otherwise.
  */
-int bt_audio_broadcast_source_start(struct bt_audio_broadcast_source *source);
+int bt_audio_broadcast_source_start(struct bt_audio_broadcast_source *source,
+				    struct bt_le_ext_adv *adv);
 
 /** @brief Stop audio broadcast source.
  *
@@ -2205,6 +2127,41 @@ int bt_audio_broadcast_source_stop(struct bt_audio_broadcast_source *source);
  *  @return Zero on success or (negative) error code otherwise.
  */
 int bt_audio_broadcast_source_delete(struct bt_audio_broadcast_source *source);
+
+/**
+ * @brief Get the broadcast ID of a broadcast source
+ *
+ * This will return the 3-octet broadcast ID that should be advertised in the
+ * extended advertising data with @ref BT_UUID_BROADCAST_AUDIO_VAL as
+ * @ref BT_DATA_SVC_DATA16.
+ *
+ * See table 3.14 in the Basic Audio Profile v1.0.1 for the structure.
+ *
+ * @param[in]  source        Pointer to the broadcast source.
+ * @param[out] broadcast_id  Pointer to the 3-octet broadcast ID.
+ *
+ * @return int		0 if on success, errno on error.
+ */
+int bt_audio_broadcast_source_get_id(const struct bt_audio_broadcast_source *source,
+				     uint32_t *const broadcast_id);
+
+/**
+ * @brief Get the Broadcast Audio Stream Endpoint of a broadcast source
+ *
+ * This will encode the BASE of a broadcast source into a buffer, that can be
+ * used for advertisement. The encoded BASE will thus be encoded as
+ * little-endian. The BASE shall be put into the periodic advertising data
+ * (see bt_le_per_adv_set_data()).
+ *
+ * See table 3.15 in the Basic Audio Profile v1.0.1 for the structure.
+ *
+ * @param source        Pointer to the broadcast source.
+ * @param base_buf      Pointer to a buffer where the BASE will be inserted.
+ *
+ * @return int		0 if on success, errno on error.
+ */
+int bt_audio_broadcast_source_get_base(struct bt_audio_broadcast_source *source,
+				       struct net_buf_simple *base_buf);
 
 /** @brief Register Broadcast sink callbacks
  * *

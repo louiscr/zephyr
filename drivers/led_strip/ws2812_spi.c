@@ -16,7 +16,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ws2812_spi);
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/sys/math_extras.h>
@@ -167,7 +167,7 @@ static int ws2812_spi_init(const struct device *dev)
 	const struct ws2812_spi_cfg *cfg = dev_cfg(dev);
 	uint8_t i;
 
-	if (!spi_is_ready(&cfg->bus)) {
+	if (!spi_is_ready_dt(&cfg->bus)) {
 		LOG_ERR("SPI device %s not ready", cfg->bus.bus->name);
 		return -ENODEV;
 	}

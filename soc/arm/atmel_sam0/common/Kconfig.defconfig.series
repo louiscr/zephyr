@@ -5,26 +5,8 @@
 
 if SOC_FAMILY_SAM0
 
-config ADC_SAM0
-	default ADC
-
-config COUNTER_SAM0_TC32
-	default COUNTER
-
-config DAC_SAM0
-	default DAC
-
-config DMA_SAM0
-	default DMA
-
 config HWINFO_SAM0
 	default HWINFO
-
-config USB_DC_SAM0
-	default USB_DEVICE_DRIVER
-
-config WDT_SAM0
-	default WATCHDOG
 
 if USB_DEVICE_DRIVER
 

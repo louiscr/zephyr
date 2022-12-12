@@ -15,7 +15,7 @@
 #define __TEST_UART_H__
 
 #include <zephyr/drivers/uart.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 /* RX and TX pins have to be connected together*/
 
@@ -45,12 +45,14 @@
 #define UART_DEVICE_DEV DT_NODELABEL(usart1)
 #elif defined(CONFIG_BOARD_NUCLEO_H723ZG) || \
 	defined(CONFIG_BOARD_NUCLEO_H743ZI) || \
-	defined(CONFIG_BOARD_STM32F3_DISCO)
+	defined(CONFIG_BOARD_STM32F3_DISCO) || \
+	defined(CONFIG_BOARD_NUCLEO_U575ZI_Q)
 #define UART_DEVICE_DEV DT_NODELABEL(usart2)
 #elif defined(CONFIG_BOARD_NUCLEO_L4R5ZI) || \
 	defined(CONFIG_BOARD_NUCLEO_L152RE) || \
 	defined(CONFIG_BOARD_STM32L562E_DK) || \
-	defined(CONFIG_BOARD_NUCLEO_L552ZE_Q)
+	defined(CONFIG_BOARD_NUCLEO_L552ZE_Q) || \
+	defined(CONFIG_BOARD_B_U585I_IOT02A)
 #define UART_DEVICE_DEV DT_NODELABEL(usart3)
 #elif defined(CONFIG_BOARD_DISCO_L475_IOT1)
 #define UART_DEVICE_DEV DT_NODELABEL(uart4)
@@ -61,6 +63,8 @@
 #define UART_DEVICE_DEV DT_NODELABEL(usart6)
 #elif defined(CONFIG_BOARD_FRDM_K82F)
 #define UART_DEVICE_DEV DT_NODELABEL(lpuart0)
+#elif defined(CONFIG_BOARD_NUCLEO_WB55RG)
+#define UART_DEVICE_DEV DT_NODELABEL(lpuart1)
 #elif defined(CONFIG_BOARD_MIMXRT1020_EVK) || \
 	defined(CONFIG_BOARD_MIMXRT1024_EVK) || \
 	defined(CONFIG_BOARD_MIMXRT1160_EVK_CM4) || \
@@ -79,32 +83,6 @@
 #define UART_DEVICE_DEV DT_NODELABEL(lpuart4)
 #else
 #define UART_DEVICE_DEV DT_CHOSEN(zephyr_console)
-#endif
-
-void init_test(void);
-
-void test_single_read(void);
-void test_multiple_rx_enable(void);
-void test_chained_read(void);
-void test_double_buffer(void);
-void test_read_abort(void);
-void test_write_abort(void);
-void test_forever_timeout(void);
-void test_long_buffers(void);
-void test_chained_write(void);
-
-void test_single_read_setup(void);
-void test_multiple_rx_enable_setup(void);
-void test_chained_read_setup(void);
-void test_double_buffer_setup(void);
-void test_read_abort_setup(void);
-void test_write_abort_setup(void);
-void test_forever_timeout_setup(void);
-void test_long_buffers_setup(void);
-void test_chained_write_setup(void);
-
-#ifdef CONFIG_USERSPACE
-void set_permissions(void);
 #endif
 
 #endif /* __TEST_UART_H__ */

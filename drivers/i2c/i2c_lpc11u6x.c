@@ -9,6 +9,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/clock_control.h>
+#include <zephyr/irq.h>
 #include "i2c_lpc11u6x.h"
 
 #define DEV_BASE(dev) (((struct lpc11u6x_i2c_config *)(dev->config))->base)
@@ -312,6 +313,10 @@ static int lpc11u6x_i2c_init(const struct device *dev)
 	err = pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
 	if (err) {
 		return err;
+	}
+
+	if (!device_is_ready(cfg->clock_dev)) {
+		return -ENODEV;
 	}
 
 	/* Configure clock and de-assert reset for I2Cx */

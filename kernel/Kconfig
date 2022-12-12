@@ -156,8 +156,7 @@ config SCHED_CPU_MASK_PIN_ONLY
 config MAIN_STACK_SIZE
 	int "Size of stack for initialization and main thread"
 	default 2048 if COVERAGE_GCOV
-	default 1024 if TEST_ARM_CORTEX_M
-	default 512 if ZTEST && !(RISCV || X86)
+	default 512 if ZTEST && !(RISCV || X86 || ARM)
 	default 1024
 	help
 	  When the initialization is complete, the thread executing it then
@@ -331,6 +330,7 @@ config BOOT_BANNER
 
 config BOOT_DELAY
 	int "Boot delay in milliseconds"
+	depends on MULTITHREADING
 	default 0
 	help
 	  This option delays bootup for the specified amount of
@@ -554,6 +554,13 @@ config EVENTS
 	  Note that setting this option slightly increases the size of the
 	  thread structure.
 
+config PIPES
+	bool "Pipe objects"
+	help
+	  This option enables kernel pipes. A pipe is a kernel object that
+	  allows a thread to send a byte stream to another thread. Pipes can
+	  be used to synchronously transfer chunks of data in whole or in part.
+
 config KERNEL_MEM_POOL
 	bool "Use Kernel Memory Pool"
 	default y
@@ -643,10 +650,11 @@ config SYS_CLOCK_EXISTS
 	bool "System clock exists and is enabled"
 	default y
 	help
-	  This option specifies that the kernel lacks timer support.
+	  This option specifies that the kernel has timer support.
+
 	  Some device configurations can eliminate significant code if
 	  this is disabled.  Obviously timeout-related APIs will not
-	  work.
+	  work when disabled.
 
 config TIMEOUT_64BIT
 	bool "Store kernel timeouts in 64 bit precision"
@@ -865,10 +873,18 @@ config SMP_BOOT_DELAY
 
 config MP_NUM_CPUS
 	int "Number of CPUs/cores"
-	default 1
+	default MP_MAX_NUM_CPUS
 	range 1 4
 	help
 	  Number of multiprocessing-capable cores available to the
+	  multicpu API and SMP features.
+
+config MP_MAX_NUM_CPUS
+	int "Maximum number of CPUs/cores"
+	default 1
+	range 1 4
+	help
+	  Maximum number of multiprocessing-capable cores available to the
 	  multicpu API and SMP features.
 
 config SCHED_IPI_SUPPORTED

@@ -69,6 +69,12 @@
 };
 
 &lptim1 {
+	clocks = <&rcc STM32_CLOCK_BUS_APB1 0x80000000>,
+		 <&rcc STM32_SRC_LSI LPTIM1_SEL(1)>;
+	status = "okay";
+};
+
+&clk_lsi {
 	status = "okay";
 };
 
@@ -131,6 +137,8 @@ uext_spi: &spi1 {
 };
 
 &rtc {
+	clocks = <&rcc STM32_CLOCK_BUS_APB1 0x00000400>,
+		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
 	status = "okay";
 };
 

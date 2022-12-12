@@ -19,6 +19,7 @@ struct intel_adsp_hda_dma_data {
 
 struct intel_adsp_hda_dma_cfg {
 	uint32_t base;
+	uint32_t regblock_size;
 	uint32_t dma_channels;
 	enum dma_channel_direction direction;
 };
@@ -57,5 +58,6 @@ int intel_adsp_hda_dma_stop(const struct device *dev, uint32_t channel);
 
 int intel_adsp_hda_dma_init(const struct device *dev);
 
+int intel_adsp_hda_dma_get_attribute(const struct device *dev, uint32_t type, uint32_t *value);
 
 #endif /* ZEPHYR_DRIVERS_DMA_INTEL_ADSP_HDA_COMMON_H_ */

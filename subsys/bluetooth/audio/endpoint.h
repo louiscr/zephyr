@@ -7,6 +7,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/kernel.h>
+#include <zephyr/types.h>
+
 #include "ascs_internal.h"
 #include "stream.h"
 
@@ -29,19 +32,8 @@ struct bt_audio_broadcast_source;
 struct bt_audio_broadcast_sink;
 struct bt_audio_ep;
 
-struct bt_audio_iso {
-	struct bt_iso_chan iso_chan;
-	struct bt_iso_chan_qos iso_qos;
-	struct bt_iso_chan_io_qos sink_io_qos;
-	struct bt_iso_chan_io_qos source_io_qos;
-	struct bt_audio_stream *sink_stream;
-	struct bt_audio_stream *source_stream;
-};
-
 struct bt_audio_ep {
 	uint8_t  dir;
-	uint16_t handle;
-	uint16_t cp_handle;
 	uint8_t  cig_id;
 	uint8_t  cis_id;
 	struct bt_ascs_ase_status status;
@@ -53,10 +45,27 @@ struct bt_audio_ep {
 	struct bt_gatt_subscribe_params subscribe;
 	struct bt_gatt_discover_params discover;
 
+	/* FIXME: Replace with metastate */
+	bool receiver_ready;
+
+	/* TODO: Consider client/server container split */
+	union {
+		struct {
+			uint16_t handle;
+			uint16_t cp_handle;
+		} client;
+		struct {
+			const struct bt_gatt_attr *attr;
+		} server;
+	};
+
 	/* TODO: Create a union to reduce memory usage */
 	struct bt_audio_unicast_group *unicast_group;
 	struct bt_audio_broadcast_source *broadcast_source;
 	struct bt_audio_broadcast_sink *broadcast_sink;
+
+	/* ASCS ASE Control Point Work */
+	struct k_work work;
 };
 
 struct bt_audio_unicast_group {
@@ -70,18 +79,27 @@ struct bt_audio_unicast_group {
 	sys_slist_t streams;
 };
 
+struct bt_audio_broadcast_stream_data {
+#if defined(CONFIG_BT_CODEC_MAX_DATA_COUNT)
+	/** Codec Specific Data count */
+	size_t   data_count;
+	/** Codec Specific Data */
+	struct bt_codec_data data[CONFIG_BT_CODEC_MAX_DATA_COUNT];
+#endif /* CONFIG_BT_CODEC_MAX_DATA_COUNT */
+};
+
 struct bt_audio_broadcast_source {
 	uint8_t stream_count;
-	uint8_t subgroup_count;
-	uint32_t pd; /** QoS Presentation Delay */
 	uint32_t broadcast_id; /* 24 bit */
 
-	struct bt_le_ext_adv *adv;
 	struct bt_iso_big *big;
-	struct bt_iso_chan *bis[BROADCAST_STREAM_CNT];
 	struct bt_codec_qos *qos;
-	/* The streams used to create the broadcast source */
-	sys_slist_t streams;
+
+	/* The codec specific configured data for each stream in the subgroup */
+	struct bt_audio_broadcast_stream_data stream_data[BROADCAST_STREAM_CNT];
+
+	/* The subgroups containing the streams used to create the broadcast source */
+	sys_slist_t subgroups;
 };
 
 struct bt_audio_broadcast_sink {

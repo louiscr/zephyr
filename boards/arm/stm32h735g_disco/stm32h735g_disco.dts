@@ -55,6 +55,10 @@
 	status = "okay";
 };
 
+&clk_lsi {
+	status = "okay";
+};
+
 &pll {
 	div-m = <5>;
 	mul-n = <110>;
@@ -131,20 +135,12 @@
 
 	mx25lm51245: ospi-nor-flash@0 {
 		compatible = "st,stm32-ospi-nor";
-		label = "MX25LM51245";
 		reg = <0>;
 		ospi-max-frequency = <DT_FREQ_M(50)>;
-		size = <DT_SIZE_M(64)>;
+		size = <DT_SIZE_M(512)>; /* 64 MBytes */
 		spi-bus-width = <OSPI_OPI_MODE>;
 		data-rate = <OSPI_DTR_TRANSFER>;
 		status = "okay";
-		sfdp-bfp = [
-			53 46 44 50 06 01 02 ff
-			00 06 01 10 30 00 00 ff
-			C2 00 01 04 10 01 00 ff
-			84 00 01 02 C0 00 00 ff
-			00 00 00 00
-		];
 
 		partitions {
 			   compatible = "fixed-partitions";
@@ -159,6 +155,12 @@
 	};
 };
 
-&lptim1 {
+&rtc {
+	clocks = <&rcc STM32_CLOCK_BUS_APB4 0x00010000>,
+		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
 	status = "okay";
+
+	backup_regs {
+		status = "okay";
+	};
 };

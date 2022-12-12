@@ -8,7 +8,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/lora.h>
 #include <zephyr/drivers/spi.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 
 #include <sx126x/sx126x.h>
 
@@ -449,7 +449,7 @@ static int sx126x_lora_init(const struct device *dev)
 		return ret;
 	}
 
-	if (!spi_is_ready(&config->bus)) {
+	if (!spi_is_ready_dt(&config->bus)) {
 		LOG_ERR("SPI device not ready");
 		return -ENODEV;
 	}

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/dac.h>
 #include <zephyr/logging/log.h>
@@ -330,7 +330,7 @@ static int dacx0508_init(const struct device *dev)
 	struct dacx0508_data *data = dev->data;
 	int ret;
 
-	if (!spi_is_ready(&config->bus)) {
+	if (!spi_is_ready_dt(&config->bus)) {
 		LOG_ERR("SPI bus %s not ready", config->bus.bus->name);
 		return -ENODEV;
 	}

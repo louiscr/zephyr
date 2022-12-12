@@ -2,6 +2,7 @@
 # vim: set syntax=python ts=4 :
 #
 # Copyright (c) 2018 Intel Corporation
+# Copyright 2022 NXP
 # SPDX-License-Identifier: Apache-2.0
 
 import os
@@ -13,15 +14,30 @@ import subprocess
 import shutil
 import re
 import argparse
+from datetime import datetime, timezone
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 
 from twisterlib.error import TwisterRuntimeError
+from twisterlib.log_helper import log_command
 
 ZEPHYR_BASE = os.getenv("ZEPHYR_BASE")
 if not ZEPHYR_BASE:
     sys.exit("$ZEPHYR_BASE environment variable undefined")
+
+try:
+    subproc = subprocess.run(['west', 'topdir'], check = True, stdout=subprocess.PIPE)
+    if subproc.returncode == 0:
+        topdir = subproc.stdout.strip().decode()
+        logger.debug(f"Project's top directory: {topdir}")
+except FileNotFoundError:
+    topdir = ZEPHYR_BASE
+    logger.warning(f"West is not installed. Using ZEPHYR_BASE {ZEPHYR_BASE} as project's top directory")
+except subprocess.CalledProcessError as e:
+    topdir = ZEPHYR_BASE
+    logger.warning(e)
+    logger.warning(f"Using ZEPHYR_BASE {ZEPHYR_BASE} as project's top directory")
 
 # Use this for internal comparisons; that's what canonicalization is
 # for. Don't use it when invoking other components of the build system
@@ -30,7 +46,7 @@ if not ZEPHYR_BASE:
 # components directly.
 # Note "normalization" is different from canonicalization, see os.path.
 canonical_zephyr_base = os.path.realpath(ZEPHYR_BASE)
-
+canonical_topdir = os.path.realpath(topdir)
 
 def parse_arguments(args):
     parser = argparse.ArgumentParser(
@@ -363,8 +379,11 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
                         help="Specify a file where to save logs.")
 
     parser.add_argument(
-        "-M", "--runtime-artifact-cleanup", action="store_true",
-        help="Delete artifacts of passing tests.")
+        "-M", "--runtime-artifact-cleanup", choices=['pass', 'all'],
+        default=None, const='pass', nargs='?',
+        help="""Cleanup test artifacts. The default behavior is 'pass'
+        which only removes artifacts of passing tests. If you wish to
+        remove all artificats including those of failed tests, use 'all'.""")
 
     test_xor_generator.add_argument(
         "-N", "--ninja", action="store_true",
@@ -512,7 +531,9 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
              "'--ninja' argument (to use Ninja build generator).")
 
     parser.add_argument(
-        "--show-footprint", action="store_true",
+        "--show-footprint",
+        action="store_true",
+        required = "--footprint-from-buildlog" in sys.argv,
         help="Show footprint statistics and deltas since last release."
     )
 
@@ -599,6 +620,12 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
              "stdout detailing RAM/ROM sizes on the specified filenames. "
              "All other command line arguments ignored.")
 
+    parser.add_argument(
+        "--footprint-from-buildlog",
+        action = "store_true",
+        help="Get information about memory footprint from generated build.log. "
+             "Requires using --show-footprint option.")
+
     options = parser.parse_args(args)
 
     # Very early error handling
@@ -661,6 +688,8 @@ class TwisterEnv:
     def __init__(self, options=None) -> None:
         self.version = None
         self.toolchain = None
+        self.commit_date = None
+        self.run_date = None
         self.options = options
         if options and options.ninja:
             self.generator_cmd = "ninja"
@@ -689,6 +718,7 @@ class TwisterEnv:
     def discover(self):
         self.check_zephyr_version()
         self.get_toolchain()
+        self.run_date = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
     def check_zephyr_version(self):
         try:
@@ -697,27 +727,41 @@ class TwisterEnv:
                                      universal_newlines=True,
                                      cwd=ZEPHYR_BASE)
             if subproc.returncode == 0:
-                self.version = subproc.stdout.strip()
-                logger.info(f"Zephyr version: {self.version}")
+                _version = subproc.stdout.strip()
+                if _version:
+                    self.version = _version
+                    logger.info(f"Zephyr version: {self.version}")
+                else:
+                    self.version = "Unknown"
+                    logger.error("Coult not determine version")
         except OSError:
             logger.info("Cannot read zephyr version.")
 
+        subproc = subprocess.run(["git", "show", "-s", "--format=%cI", "HEAD"],
+                                     stdout=subprocess.PIPE,
+                                     universal_newlines=True,
+                                     cwd=ZEPHYR_BASE)
+        if subproc.returncode == 0:
+            self.commit_date = subproc.stdout.strip()
+        else:
+            self.commit_date = "Unknown"
 
     @staticmethod
     def run_cmake_script(args=[]):
+        script = os.fspath(args[0])
 
-        logger.debug("Running cmake script %s" % (args[0]))
+        logger.debug("Running cmake script %s", script)
 
         cmake_args = ["-D{}".format(a.replace('"', '')) for a in args[1:]]
-        cmake_args.extend(['-P', args[0]])
+        cmake_args.extend(['-P', script])
 
-        logger.debug("Calling cmake with arguments: {}".format(cmake_args))
         cmake = shutil.which('cmake')
         if not cmake:
             msg = "Unable to find `cmake` in path"
             logger.error(msg)
             raise Exception(msg)
         cmd = [cmake] + cmake_args
+        log_command(logger, "Calling cmake", cmd)
 
         kwargs = dict()
         kwargs['stdout'] = subprocess.PIPE
@@ -746,7 +790,7 @@ class TwisterEnv:
         return results
 
     def get_toolchain(self):
-        toolchain_script = Path(ZEPHYR_BASE) / Path('cmake/modules/verify-toolchain.cmake')
+        toolchain_script = Path(ZEPHYR_BASE) / Path('cmake/verify-toolchain.cmake')
         result = self.run_cmake_script([toolchain_script, "FORMAT=json"])
 
         try:

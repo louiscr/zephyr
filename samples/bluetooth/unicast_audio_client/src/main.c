@@ -7,7 +7,7 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <errno.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
@@ -23,7 +23,7 @@ static struct bt_audio_unicast_group *unicast_group;
 static struct bt_codec *remote_codec_capabilities[CONFIG_BT_AUDIO_UNICAST_CLIENT_PAC_COUNT];
 static struct bt_audio_sink {
 	struct bt_audio_ep *ep;
-	uint32_t seq_num;
+	uint16_t seq_num;
 } sinks[CONFIG_BT_AUDIO_UNICAST_CLIENT_ASE_SNK_COUNT];
 static struct bt_audio_ep *sources[CONFIG_BT_AUDIO_UNICAST_CLIENT_ASE_SRC_COUNT];
 NET_BUF_POOL_FIXED_DEFINE(tx_pool, CONFIG_BT_AUDIO_UNICAST_CLIENT_ASE_SNK_COUNT,
@@ -55,7 +55,7 @@ static K_SEM_DEFINE(sem_stream_qos, 0, 1);
 static K_SEM_DEFINE(sem_stream_enabled, 0, 1);
 static K_SEM_DEFINE(sem_stream_started, 0, 1);
 
-static uint32_t get_and_incr_seq_num(const struct bt_audio_stream *stream)
+static uint16_t get_and_incr_seq_num(const struct bt_audio_stream *stream)
 {
 	for (size_t i = 0U; i < configured_sink_stream_count; i++) {
 		if (stream->ep == sinks[i].ep) {
@@ -68,7 +68,7 @@ static uint32_t get_and_incr_seq_num(const struct bt_audio_stream *stream)
 	return 0;
 }
 
-#if defined(CONFIG_LIBLC3CODEC)
+#if defined(CONFIG_LIBLC3)
 
 #include "lc3.h"
 #include "math.h"
@@ -322,7 +322,7 @@ static void audio_timer_timeout(struct k_work *work)
 	k_work_schedule(&audio_send_work, K_MSEC(1000));
 
 	len_to_send++;
-	if (len_to_send > ARRAY_SIZE(buf_data)) {
+	if (len_to_send > codec_configuration.qos.sdu) {
 		len_to_send = 1;
 	}
 }
@@ -752,7 +752,7 @@ static int init(void)
 
 	bt_gatt_cb_register(&gatt_callbacks);
 
-#if defined(CONFIG_LIBLC3CODEC)
+#if defined(CONFIG_LIBLC3)
 	k_work_init_delayable(&audio_send_work, lc3_audio_timer_timeout);
 #else
 	k_work_init_delayable(&audio_send_work, audio_timer_timeout);
@@ -961,7 +961,7 @@ static int set_stream_qos(void)
 
 static int enable_streams(void)
 {
-	if (IS_ENABLED(CONFIG_LIBLC3CODEC)) {
+	if (IS_ENABLED(CONFIG_LIBLC3)) {
 		init_lc3();
 	}
 

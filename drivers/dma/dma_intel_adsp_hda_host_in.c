@@ -15,12 +15,14 @@ static const struct dma_driver_api intel_adsp_hda_dma_host_in_api = {
 	.start = intel_adsp_hda_dma_start,
 	.stop = intel_adsp_hda_dma_stop,
 	.get_status = intel_adsp_hda_dma_status,
+	.get_attribute = intel_adsp_hda_dma_get_attribute,
 	.chan_filter = intel_adsp_hda_dma_chan_filter,
 };
 
 #define INTEL_ADSP_HDA_DMA_HOST_IN_INIT(inst)                                                      \
 	static const struct intel_adsp_hda_dma_cfg intel_adsp_hda_dma##inst##_config = {           \
 		.base = DT_INST_REG_ADDR(inst),                                                    \
+		.regblock_size  = DT_INST_REG_SIZE(inst),					   \
 		.dma_channels = DT_INST_PROP(inst, dma_channels),                                  \
 		.direction = MEMORY_TO_HOST                                                        \
 	};                                                                                         \

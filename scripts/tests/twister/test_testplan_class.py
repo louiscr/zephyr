@@ -26,7 +26,7 @@ def test_testplan_add_testsuites(class_testplan):
     class_testplan.TESTSUITE_FILENAME = 'test_data.yaml'
     class_testplan.add_testsuites()
 
-    tests_rel_dir = 'scripts/tests/twister/test_data/testsuites/tests/'
+    tests_rel_dir = 'zephyr/scripts/tests/twister/test_data/testsuites/tests/'
     expected_testsuites = ['test_b.check_1',
                           'test_b.check_2',
                           'test_c.check_1',
@@ -76,7 +76,7 @@ def test_get_all_testsuites(class_env, all_testsuites_dict):
                       'test_c.check_2', 'test_d.check_1.unit_1a',
                       'test_d.check_1.unit_1b']
     tests = plan.get_all_tests()
-    result = [c.name for c in tests]
+    result = [c for c in tests]
     assert len(plan.get_all_tests()) == len(expected_tests)
     assert sorted(result) == sorted(expected_tests)
 

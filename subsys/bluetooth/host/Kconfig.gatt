@@ -146,6 +146,14 @@ config BT_GATT_ENFORCE_CHANGE_UNAWARE
 
 endif # BT_GATT_CACHING
 
+config BT_GATT_ENFORCE_SUBSCRIPTION
+	bool "GATT Enforce characteristic subscription"
+	default y
+	help
+	  When enabled, this option will make the server block sending
+	  notifications and indications to a device which has not subscribed to
+	  the supplied characteristic.
+
 config BT_GATT_CLIENT
 	bool "GATT client support"
 	help
@@ -259,15 +267,27 @@ if BT_DEBUG
 
 config BT_DEBUG_ATT
 	bool "Bluetooth Attribute Protocol (ATT) debug"
+	select DEPRECATED
 	help
 	  This option enables debug support for the Bluetooth
 	  Attribute Protocol (ATT).
 
+module = BT_ATT
+legacy-debug-sym = BT_DEBUG_ATT
+module-str = "Bluetooth Attribute Protocol (ATT)"
+source "subsys/bluetooth/common/Kconfig.template.log_config_bt"
+
 config BT_DEBUG_GATT
 	bool "Bluetooth Generic Attribute Profile (GATT) debug"
+	select DEPRECATED
 	help
 	  This option enables debug support for the Bluetooth
 	  Generic Attribute Profile (GATT).
+
+module = BT_GATT
+legacy-debug-sym = BT_DEBUG_GATT
+module-str = "Bluetooth Generic Attribute Profile (GATT)"
+source "subsys/bluetooth/common/Kconfig.template.log_config_bt"
 
 endif # BT_DEBUG
 

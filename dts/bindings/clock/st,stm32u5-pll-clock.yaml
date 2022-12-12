@@ -53,14 +53,12 @@ properties:
 
     div-p:
       type: int
-      required: false
       description: |
           PLLx DIVP division factor
           Valid range: 1 - 128
 
     div-q:
       type: int
-      required: false
       description: |
           PLLx DIVQ division factor
           Valid range: 1 - 128
@@ -70,5 +68,6 @@ properties:
       required: true
       description: |
           PLLx DIVR division factor
-          PLL1 DIVR must not be set to 1, but DIVR can be set to 1 for PLL2 and PLL3
+          On PLL1, only division by 1 and even division values are allowed.
+          No restrictions for PLL2 and PLL3
           Valid range: 1 - 128

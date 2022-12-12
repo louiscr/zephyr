@@ -9,9 +9,14 @@
  *
  */
 
-#include <zephyr/zephyr.h>
-#include <ztest.h>
+#include <zephyr/kernel.h>
+#include <zephyr/ztest.h>
 #include <string.h>
+#ifdef CONFIG_ARCH_POSIX
+#include <unistd.h>
+#else
+#include <zephyr/posix/unistd.h>
+#endif
 #include <getopt.h>
 
 ZTEST_SUITE(getopt_test_suite, NULL, NULL, NULL, NULL, NULL);

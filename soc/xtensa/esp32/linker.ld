@@ -18,7 +18,11 @@
 #include <zephyr/linker/linker-tool.h>
 
 #define RAMABLE_REGION dram0_0_seg
+#ifndef CONFIG_ESP32_NETWORK_CORE
 #define RAMABLE_REGION_1 dram0_1_seg
+#else
+#define RAMABLE_REGION_1 dram0_0_seg
+#endif
 #define RODATA_REGION drom0_0_seg
 #define IRAM_REGION iram0_0_seg
 #define FLASH_CODE_REGION irom0_0_seg
@@ -35,10 +39,12 @@
 #define IROM_SEG_ORG 0x400D0020
 #define IROM_SEG_LEN 0x330000-0x20
 #define IROM_SEG_ALIGN 0x4
+#define IRAM_SEG_LEN 0x20000
 #else
 #define IROM_SEG_ORG 0x400D0000
 #define IROM_SEG_LEN 0x330000
 #define IROM_SEG_ALIGN 0x10000
+#define IRAM_SEG_LEN 0x13000
 #endif
 
 MEMORY
@@ -46,7 +52,13 @@ MEMORY
   mcuboot_hdr (RX): org = 0x0, len = 0x20
   metadata (RX): org = 0x20, len = 0x20
   ROM (RX): org = 0x40, len = ROM_SIZE - 0x40
-  iram0_0_seg(RX): org = 0x40080000, len = 0x20000
+
+  #ifdef CONFIG_ESP32_NETWORK_CORE
+  iram0_0_seg(RX): org = 0x40080000, len = 0x08000
+  #else
+  iram0_0_seg(RX): org = 0x40080000, len = IRAM_SEG_LEN
+  #endif
+
   irom0_0_seg(RX): org = IROM_SEG_ORG, len = IROM_SEG_LEN
   /*
    * Following is DRAM memory split with reserved address ranges in ESP32:
@@ -61,7 +73,14 @@ MEMORY
    *  - Utilize available memory regions to full capacity
    */
   dram0_0_seg(RW): org = 0x3FFB0000 + CONFIG_ESP32_BT_RESERVE_DRAM, len = 0x2c200 - CONFIG_ESP32_BT_RESERVE_DRAM
+
+  #ifdef CONFIG_ESP32_NETWORK_CORE
+  dram0_shm0_seg(RW): org = 0x3FFE5230, len = 2K /* shared RAM reserved for IPM */
+  dram0_sem0_seg(RW): org = 0x3FFE5A30, len = 8 /* shared data reserved for IPM data header */
+  dram0_1_seg(RW): org = 0x3FFE5A38, len = 0K /* for AMP builds dram0_1 is reserved for network core */
+  #else
   dram0_1_seg(RW): org = 0x3FFE5230, len = 0x1BCB0 - 0xEE0 /* skip data for APP CPU initialization usage */
+  #endif
 
   /* DROM is the first segment placed in generated binary.
    * MCUboot binary for ESP32 has image header of 0x20 bytes.
@@ -130,7 +149,7 @@ SECTIONS
 #include <zephyr/linker/rel-sections.ld>
 
   _image_drom_start = LOADADDR(_RODATA_SECTION_NAME);
-  _image_drom_size = LOADADDR(_RODATA_SECTION_NAME) + SIZEOF(_RODATA_SECTION_NAME) - _image_drom_start;
+  _image_drom_size = LOADADDR(_RODATA_SECTION_END) + SIZEOF(_RODATA_SECTION_END)  - _image_drom_start;
   _image_drom_vaddr = ADDR(_RODATA_SECTION_NAME);
 
   /* NOTE: .rodata section should be the first section in the linker script and no
@@ -141,7 +160,7 @@ SECTIONS
    */
   SECTION_PROLOGUE(_RODATA_SECTION_NAME,,)
   {
-    _rodata_start = ABSOLUTE(.);
+    __rodata_region_start = ABSOLUTE(.);
 
     . = ALIGN(4);
     #include <snippets-rodata.ld>
@@ -172,7 +191,7 @@ SECTIONS
     *(.dynamic)
     *(.gnu.version_d)
     . = ALIGN(4);
-    _rodata_end = ABSOLUTE(.);
+    __rodata_region_end = ABSOLUTE(.);
     /* Literals are also RO data. */
     _lit4_start = ABSOLUTE(.);
     *(*.lit4)
@@ -185,6 +204,8 @@ SECTIONS
     *(.tdata.*)
     *(.tbss)
     *(.tbss.*)
+    *(.rodata_wlog)
+    *(.rodata_wlog*)
     _thread_local_end = ABSOLUTE(.);
     . = ALIGN(4);
   } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)
@@ -203,6 +224,14 @@ SECTIONS
   #include <zephyr/linker/common-rom/common-rom-misc.ld>
   #pragma pop_macro("GROUP_ROM_LINK_IN")
 
+  /* Create an explicit section at the end of all the data that shall be mapped into drom.
+   * This is used to calculate the size of the _image_drom_size variable */
+  SECTION_PROLOGUE(_RODATA_SECTION_END,,)
+  {
+    . = ALIGN(4);
+    _image_rodata_end = ABSOLUTE(.);
+  } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)
+
   _image_dram_start = LOADADDR(.dram0.data);
   _image_dram_size = LOADADDR(.dram0.end) + SIZEOF(.dram0.end) - _image_dram_start;
   _image_dram_vaddr = ADDR(.dram0.data);
@@ -211,7 +240,7 @@ SECTIONS
 
   .dram0.data :
   {
-    _data_start = ABSOLUTE(.);
+    __data_start = ABSOLUTE(.);
 
     _btdm_data_start = ABSOLUTE(.);
     *libbtdm_app.a:(.data .data.*)
@@ -267,7 +296,7 @@ SECTIONS
     #include <snippets-rwdata.ld>
     . = ALIGN(4);
     _end = ABSOLUTE(.);
-    _data_end = ABSOLUTE(.);
+    __data_end = ABSOLUTE(.);
   } GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
   _image_iram_start = LOADADDR(.iram0.vectors);
@@ -324,10 +353,6 @@ SECTIONS
     *(.iram0.literal .iram.literal .iram.text.literal .iram0.text .iram.text)
     *libesp32.a:panic.*(.literal .text .literal.* .text.*)
     *librtc.a:(.literal .text .literal.* .text.*)
-    *libsubsys__net__l2__ethernet.a:(.literal .text .literal.* .text.*)
-    *libsubsys__net__lib__config.a:(.literal .text .literal.* .text.*)
-    *libsubsys__net__ip.a:(.literal .text .literal.* .text.*)
-    *libsubsys__net.a:(.literal .text .literal.* .text.*)
     *libarch__xtensa__core.a:(.literal .text .literal.* .text.*)
     *libkernel.a:(.literal .text .literal.* .text.*)
     *libsoc.a:rtc_*.*(.literal .text .literal.* .text.*)
@@ -355,7 +380,7 @@ SECTIONS
 
 #if defined(CONFIG_ESP32_WIFI_IRAM_OPT)
     *libnet80211.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.*)
-    *libpp.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.*)
+    *libpp.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.* .wifiorslpiram .wifiorslpiram.*)
 #endif
 
 #if defined(CONFIG_ESP32_WIFI_RX_IRAM_OPT)
@@ -399,6 +424,40 @@ SECTIONS
     *rtc_wake_stub*.o(COMMON)
     _rtc_bss_end = ABSOLUTE(.);
   } GROUP_LINK_IN(rtc_slow_seg)
+
+  /* This section located in RTC SLOW Memory area.
+     It holds data marked with RTC_SLOW_ATTR attribute.
+     See the file "esp_attr.h" for more information.
+  */
+  .rtc.force_slow :
+  {
+    . = ALIGN(4);
+    _rtc_force_slow_start = ABSOLUTE(.);
+    *(.rtc.force_slow .rtc.force_slow.*)
+    . = ALIGN(4) ;
+    _rtc_force_slow_end = ABSOLUTE(.);
+  } > rtc_slow_seg
+
+  /* Get size of rtc slow data */
+  _rtc_slow_length = (_rtc_force_slow_end - _rtc_data_start);
+
+#if defined(CONFIG_ESP_SPIRAM)
+  .ext_ram.bss (NOLOAD):
+  {
+    _ext_ram_data_start = ABSOLUTE(.);
+
+#if defined(CONFIG_ESP32_WIFI_NET_ALLOC_SPIRAM)
+    *libdrivers__wifi.a:(.noinit .noinit.*)
+    *libsubsys__net__l2__ethernet.a:(.noinit .noinit.*)
+    *libsubsys__net__lib__config.a:(.noinit .noinit.*)
+    *libsubsys__net__ip.a:(.noinit .noinit.*)
+    *libsubsys__net.a:(.noinit .noinit.*)
+#endif
+
+    *(.ext_ram.bss*)
+    _ext_ram_data_end = ABSOLUTE(.) + CONFIG_ESP_SPIRAM_SIZE;
+  } GROUP_LINK_IN(ext_ram_seg)
+#endif
 
   /* Shared RAM */
   SECTION_DATA_PROLOGUE(_BSS_SECTION_NAME,(NOLOAD),)
@@ -445,15 +504,6 @@ SECTIONS
     . = ALIGN (8);
   } GROUP_LINK_IN(RAMABLE_REGION_1)
 
-#if defined(CONFIG_ESP_SPIRAM)
-  .ext_ram.bss (NOLOAD):
-  {
-    _ext_ram_data_start = ABSOLUTE(.);
-    *(.ext_ram.bss*)
-    _ext_ram_data_end = ABSOLUTE(.) + CONFIG_ESP_SPIRAM_SIZE;
-  } > ext_ram_seg
-#endif
-
   _image_irom_start = LOADADDR(.flash.text);
   _image_irom_size = LOADADDR(.flash.text) + SIZEOF(.flash.text) - _image_irom_start;
   _image_irom_vaddr = ADDR(.flash.text);
@@ -465,7 +515,7 @@ SECTIONS
 
 #if !defined(CONFIG_ESP32_WIFI_IRAM_OPT)
     *libnet80211.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.*)
-    *libpp.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.*)
+    *libpp.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.* .wifiorslpiram .wifiorslpiram.*)
 #endif
 
 #if !defined(CONFIG_ESP32_WIFI_RX_IRAM_OPT)

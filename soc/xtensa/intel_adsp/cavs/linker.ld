@@ -1,4 +1,14 @@
-/* Copyright (c) 2021 Intel Corporation
+/*
+ * Copyright (c) 2019 Intel Corporation
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <cavs-link.ld>
+
+/**
+ * @file
+ * @brief Linker command/script file
+ *
+ * Linker script for the intel_apl_adsp platform
+ */
+
+#include <xtensa-cavs-linker.ld>

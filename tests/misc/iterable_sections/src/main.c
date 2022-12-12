@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 struct test_ram {
 	int i;
@@ -51,10 +51,10 @@ struct test_rom {
 };
 
 /* declare in random order to check that the linker is sorting by name */
-STRUCT_SECTION_ITERABLE(test_rom, rom1) = {0x10};
-STRUCT_SECTION_ITERABLE(test_rom, rom3) = {0x30};
-STRUCT_SECTION_ITERABLE(test_rom, rom4) = {0x40};
-STRUCT_SECTION_ITERABLE(test_rom, rom2) = {0x20};
+const STRUCT_SECTION_ITERABLE(test_rom, rom1) = {0x10};
+const STRUCT_SECTION_ITERABLE(test_rom, rom3) = {0x30};
+const STRUCT_SECTION_ITERABLE(test_rom, rom4) = {0x40};
+const STRUCT_SECTION_ITERABLE(test_rom, rom2) = {0x20};
 
 #define ROM_EXPECT 0x10203040
 

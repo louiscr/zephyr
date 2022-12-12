@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
-#include <ztest.h>
+#include <zephyr/kernel.h>
+#include <zephyr/ztest.h>
 
 /* Experimentally 10ms is enough time to get the second CPU to run on
  * all known platforms.
@@ -16,7 +16,7 @@
 BUILD_ASSERT(CONFIG_SMP);
 BUILD_ASSERT(CONFIG_SMP_BOOT_DELAY);
 BUILD_ASSERT(CONFIG_KERNEL_COHERENCE);
-BUILD_ASSERT(CONFIG_MP_NUM_CPUS > 1);
+BUILD_ASSERT(CONFIG_MP_MAX_NUM_CPUS > 1);
 
 #define STACKSZ 2048
 char stack[STACKSZ];

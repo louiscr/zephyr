@@ -21,11 +21,11 @@
  *   -# Data is transferred correctly from src to dest, for each loop
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/dma.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 /* in millisecond */
 #define SLEEPTIME 250
@@ -271,7 +271,7 @@ static int test_loop_suspend_resume(void)
 		res = dma_suspend(dma, chan_id);
 		if (res == -ENOSYS) {
 			done = 1;
-			TC_PRINT("suspend not supported");
+			TC_PRINT("suspend not supported\n");
 			dma_stop(dma, chan_id);
 			return TC_PASS;
 		}
@@ -340,13 +340,13 @@ static int test_loop_suspend_resume(void)
 
 
 /* export test cases */
-void test_dma_m2m_loop(void)
+ZTEST(dma_m2m_loop, test_dma_m2m_loop)
 {
-	zassert_true((test_loop() == TC_PASS), NULL);
+	zassert_true((test_loop() == TC_PASS));
 }
 
 /* export test cases */
-void test_dma_m2m_loop_suspend_resume(void)
+ZTEST(dma_m2m_loop, test_dma_m2m_loop_suspend_resume)
 {
-	zassert_true((test_loop_suspend_resume() == TC_PASS), NULL);
+	zassert_true((test_loop_suspend_resume() == TC_PASS));
 }

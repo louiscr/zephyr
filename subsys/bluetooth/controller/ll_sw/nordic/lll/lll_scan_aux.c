@@ -44,9 +44,6 @@
 
 #include "ll_feat.h"
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
-#define LOG_MODULE_NAME bt_ctlr_lll_scan_aux
-#include "common/log.h"
 #include <soc.h>
 #include <ull_scan_types.h>
 #include "hal/debug.h"
@@ -169,8 +166,8 @@ uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 
 	/* No need to scan further if no aux_ptr filled */
 	aux_ptr = (void *)pri_dptr;
-	if (unlikely(!pri_hdr->aux_ptr || !aux_ptr->offs ||
-		     (aux_ptr->phy > EXT_ADV_AUX_PHY_LE_CODED))) {
+	if (unlikely(!pri_hdr->aux_ptr || !PDU_ADV_AUX_PTR_OFFSET_GET(aux_ptr) ||
+		     (PDU_ADV_AUX_PTR_PHY_GET(aux_ptr) > EXT_ADV_AUX_PHY_LE_CODED))) {
 		return 0;
 	}
 
@@ -182,7 +179,7 @@ uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 	}
 
 	/* Calculate the aux offset from start of the scan window */
-	aux_offset_us = (uint32_t)aux_ptr->offs * window_size_us;
+	aux_offset_us = (uint32_t)PDU_ADV_AUX_PTR_OFFSET_GET(aux_ptr) * window_size_us;
 
 	/* Calculate the window widening that needs to be deducted */
 	if (aux_ptr->ca) {
@@ -191,7 +188,7 @@ uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 		window_widening_us = SCA_DRIFT_500_PPM_US(aux_offset_us);
 	}
 
-	phy = BIT(aux_ptr->phy);
+	phy = BIT(PDU_ADV_AUX_PTR_PHY_GET(aux_ptr));
 
 	/* Calculate the minimum overhead to decide if LLL or ULL scheduling
 	 * to be used for auxiliary PDU reception.
@@ -252,6 +249,7 @@ void lll_scan_aux_isr_aux_setup(void *param)
 	uint32_t aux_offset_us;
 	uint32_t aux_start_us;
 	struct lll_scan *lll;
+	uint32_t start_us;
 	uint8_t phy_aux;
 	uint32_t hcto;
 
@@ -260,7 +258,7 @@ void lll_scan_aux_isr_aux_setup(void *param)
 	node_rx = param;
 	ftr = &node_rx->hdr.rx_ftr;
 	aux_ptr = ftr->aux_ptr;
-	phy_aux = BIT(aux_ptr->phy);
+	phy_aux = BIT(PDU_ADV_AUX_PTR_PHY_GET(aux_ptr));
 	ftr->aux_phy = phy_aux;
 
 	lll = ftr->param;
@@ -273,7 +271,7 @@ void lll_scan_aux_isr_aux_setup(void *param)
 	}
 
 	/* Calculate the aux offset from start of the scan window */
-	aux_offset_us = (uint32_t)aux_ptr->offs * window_size_us;
+	aux_offset_us = (uint32_t)PDU_ADV_AUX_PTR_OFFSET_GET(aux_ptr) * window_size_us;
 
 	/* Calculate the window widening that needs to be deducted */
 	if (aux_ptr->ca) {
@@ -336,13 +334,15 @@ void lll_scan_aux_isr_aux_setup(void *param)
 	aux_start_us -= lll_radio_rx_ready_delay_get(phy_aux, PHY_FLAGS_S8);
 	aux_start_us -= window_widening_us;
 	aux_start_us -= EVENT_JITTER_US;
-	radio_tmr_start_us(0, aux_start_us);
+
+	start_us = radio_tmr_start_us(0, aux_start_us);
 
 	/* Setup header complete timeout */
-	hcto = ftr->radio_end_us + aux_offset_us;
-	hcto += window_size_us;
-	hcto += window_widening_us;
+	hcto = start_us;
 	hcto += EVENT_JITTER_US;
+	hcto += window_widening_us;
+	hcto += lll_radio_rx_ready_delay_get(phy_aux, PHY_FLAGS_S8);
+	hcto += window_size_us;
 	hcto += radio_rx_chain_delay_get(phy_aux, PHY_FLAGS_S8);
 	hcto += addr_us_get(phy_aux);
 	radio_tmr_hcto_configure(hcto);
@@ -358,7 +358,7 @@ void lll_scan_aux_isr_aux_setup(void *param)
 #if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 
-	radio_gpio_pa_lna_enable(aux_start_us +
+	radio_gpio_pa_lna_enable(start_us +
 				 radio_rx_ready_delay_get(phy_aux,
 							  PHY_FLAGS_S8) -
 				 HAL_RADIO_GPIO_LNA_OFFSET);
@@ -678,8 +678,7 @@ static void isr_done(void *param)
 		node_rx->hdr.rx_ftr.param = lll;
 		node_rx->hdr.rx_ftr.aux_failed = 1U;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
-		ull_rx_sched();
+		ull_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	} else if (!trx_cnt) {
 		struct event_done_extra *e;
@@ -861,8 +860,7 @@ isr_rx_do_close:
 			 */
 			node_rx->hdr.rx_ftr.param = lll;
 
-			ull_rx_put(node_rx->hdr.link, node_rx);
-			ull_rx_sched();
+			ull_rx_put_sched(node_rx->hdr.link, node_rx);
 		}
 
 		/* Check if LLL scheduled auxiliary PDU reception by scan
@@ -1210,8 +1208,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 
 		ftr->aux_lll_sched = 0U;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
-		ull_rx_sched();
+		ull_rx_put_sched(node_rx->hdr.link, node_rx);
 
 		return 0;
 
@@ -1288,9 +1285,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_REPORT;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
-
-		ull_rx_sched();
+		ull_rx_put_sched(node_rx->hdr.link, node_rx);
 
 		/* Next aux scan is scheduled from LLL, we already handled radio
 		 * disable so prevent caller from doing it again.
@@ -1550,8 +1545,7 @@ static void isr_rx_connect_rsp(void *param)
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 isr_rx_do_close:
-	ull_rx_put(rx->hdr.link, rx);
-	ull_rx_sched();
+	ull_rx_put_sched(rx->hdr.link, rx);
 
 	if (lll->lll_aux) {
 		struct node_rx_pdu *node_rx;
@@ -1564,8 +1558,7 @@ isr_rx_do_close:
 
 		node_rx->hdr.rx_ftr.param = lll->lll_aux;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
-		ull_rx_sched();
+		ull_rx_put_sched(node_rx->hdr.link, node_rx);
 
 		radio_isr_set(lll_scan_isr_resume, lll);
 	} else {

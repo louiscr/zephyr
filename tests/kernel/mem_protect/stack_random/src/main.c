@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/ztest.h>
+#include <zephyr/kernel.h>
 
 #define STACKSIZE       2048
 #define THREAD_COUNT	64
@@ -71,6 +71,7 @@ ZTEST(stack_pointer_randomness, test_stack_pt_randomization)
 				STACKSIZE, (k_thread_entry_t)alternate_thread,
 				NULL, NULL, NULL, K_HIGHEST_THREAD_PRIO, 0,
 				K_NO_WAIT);
+		k_sleep(K_MSEC(10));
 	}
 
 

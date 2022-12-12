@@ -50,24 +50,30 @@
 			compatible = "st,stm32-ospi";
 			reg = <0x52005000 0x1000>;
 			interrupts = <92 0>;
+			clock-names = "ospix", "ospi-ker";
 			clocks = <&rcc STM32_CLOCK_BUS_AHB3 0x00004000>,
 				<&rcc STM32_SRC_PLL1_Q OSPI_SEL(1)>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
-			label= "OCTOSPI1";
 		};
 
 		octospi2: octospi@5200a000 {
 			compatible = "st,stm32-ospi";
 			reg = <0x5200a000 0x1000>;
 			interrupts = <150 0>;
+			clock-names = "ospix", "ospi-ker";
 			clocks = <&rcc STM32_CLOCK_BUS_AHB3 0x000080000>,
 				<&rcc STM32_SRC_PLL1_Q OSPI_SEL(1)>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
-			label= "OCTOSPI2";
+		};
+
+		rng: rng@48021800 {
+			nist-config = <0xf00d00>;
+			health-test-magic = <0x17590abc>;
+			health-test-config = <0x72ac>;
 		};
 	};
 
@@ -127,5 +133,12 @@
 	otghs_fs_phy: otghs_fs_phy {
 		compatible = "usb-nop-xceiv";
 		#phy-cells = <0>;
+	};
+
+	die_temp: dietemp {
+		ts-cal1-addr = <0x08FFF814>;
+		ts-cal2-addr = <0x08FFF818>;
+		io-channels = <&adc2 18>;
+		ts-cal2-temp = <130>;
 	};
 };

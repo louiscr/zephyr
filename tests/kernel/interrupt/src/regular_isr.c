@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <interrupt_util.h>
+#include <zephyr/ztest.h>
+#include <zephyr/interrupt_util.h>
+#include <zephyr/irq.h>
 
 /*
  * Other arch has already been tested in testcase of gen_isr_table,

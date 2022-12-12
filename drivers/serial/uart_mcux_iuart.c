@@ -9,9 +9,9 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/clock_control.h>
+#include <zephyr/irq.h>
 #include <errno.h>
 #include <fsl_uart.h>
-#include <soc.h>
 #include <zephyr/drivers/pinctrl.h>
 
 struct mcux_iuart_config {
@@ -226,6 +226,10 @@ static int mcux_iuart_init(const struct device *dev)
 	uart_config_t uart_config;
 	uint32_t clock_freq;
 	int err;
+
+	if (!device_is_ready(config->clock_dev)) {
+		return -ENODEV;
+	}
 
 	if (clock_control_get_rate(config->clock_dev, config->clock_subsys,
 				   &clock_freq)) {

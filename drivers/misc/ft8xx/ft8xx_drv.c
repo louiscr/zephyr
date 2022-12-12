@@ -6,7 +6,7 @@
 
 #include "ft8xx_drv.h"
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
@@ -55,7 +55,7 @@ int ft8xx_drv_init(void)
 {
 	int ret;
 
-	if (!spi_is_ready(&spi)) {
+	if (!spi_is_ready_dt(&spi)) {
 		LOG_ERR("SPI bus %s not ready", spi.bus->name);
 		return -ENODEV;
 	}

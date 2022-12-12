@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/check.h>
 
@@ -19,9 +19,11 @@
 #include <zephyr/bluetooth/audio/micp.h>
 #include <zephyr/bluetooth/audio/aics.h>
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_MICP_MIC_DEV)
-#define LOG_MODULE_NAME bt_micp
-#include "common/log.h"
+#include "audio_internal.h"
+
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(bt_micp, CONFIG_BT_MICP_MIC_DEV_LOG_LEVEL);
 
 struct bt_micp_server {
 	uint8_t mute;
@@ -34,14 +36,14 @@ static struct bt_micp_server micp_inst;
 
 static void mute_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
-	BT_DBG("value 0x%04x", value);
+	LOG_DBG("value 0x%04x", value);
 }
 
 static ssize_t read_mute(struct bt_conn *conn,
 			 const struct bt_gatt_attr *attr, void *buf,
 			 uint16_t len, uint16_t offset)
 {
-	BT_DBG("Mute %u", micp_inst.mute);
+	LOG_DBG("Mute %u", micp_inst.mute);
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset,
 				 &micp_inst.mute, sizeof(micp_inst.mute));
@@ -70,7 +72,7 @@ static ssize_t write_mute(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 		return BT_GATT_ERR(BT_MICP_ERR_MUTE_DISABLED);
 	}
 
-	BT_DBG("%u", *val);
+	LOG_DBG("%u", *val);
 
 	if (*val != micp_inst.mute) {
 		micp_inst.mute = *val;
@@ -94,12 +96,11 @@ static ssize_t write_mute(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 #define BT_MICP_SERVICE_DEFINITION \
 	BT_GATT_PRIMARY_SERVICE(BT_UUID_MICS), \
 	AICS_INCLUDES(CONFIG_BT_MICP_MIC_DEV_AICS_INSTANCE_COUNT) \
-	BT_GATT_CHARACTERISTIC(BT_UUID_MICS_MUTE, \
-		BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY, \
-		BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT, \
-		read_mute, write_mute, NULL), \
-	BT_GATT_CCC(mute_cfg_changed, \
-		BT_GATT_PERM_READ | BT_GATT_PERM_WRITE_ENCRYPT)
+	BT_AUDIO_CHRC(BT_UUID_MICS_MUTE, \
+		      BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY, \
+		      BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT, \
+		      read_mute, write_mute, NULL), \
+	BT_AUDIO_CCC(mute_cfg_changed)
 
 #define MICS_ATTR_COUNT \
 	ARRAY_SIZE(((struct bt_gatt_attr []){ BT_MICP_SERVICE_DEFINITION }))
@@ -119,14 +120,14 @@ static int prepare_aics_inst(struct bt_micp_mic_dev_register_param *param)
 		if (bt_uuid_cmp(mics_attrs[i].uuid, BT_UUID_GATT_INCLUDE) == 0) {
 			micp_inst.aics_insts[j] = bt_aics_free_instance_get();
 			if (micp_inst.aics_insts[j] == NULL) {
-				BT_DBG("Could not get free AICS instances[%u]", j);
+				LOG_DBG("Could not get free AICS instances[%u]", j);
 				return -ENOMEM;
 			}
 
 			err = bt_aics_register(micp_inst.aics_insts[j],
 					       &param->aics_param[j]);
 			if (err != 0) {
-				BT_DBG("Could not register AICS instance[%u]: %d", j, err);
+				LOG_DBG("Could not register AICS instance[%u]: %d", j, err);
 				return err;
 			}
 
@@ -161,7 +162,7 @@ int bt_micp_mic_dev_register(struct bt_micp_mic_dev_register_param *param)
 #if defined(CONFIG_BT_MICP_MIC_DEV_AICS)
 	err = prepare_aics_inst(param);
 	if (err != 0) {
-		BT_DBG("Failed to prepare AICS instances: %d", err);
+		LOG_DBG("Failed to prepare AICS instances: %d", err);
 
 		return err;
 	}
@@ -172,7 +173,7 @@ int bt_micp_mic_dev_register(struct bt_micp_mic_dev_register_param *param)
 	err = bt_gatt_service_register(&mics_svc);
 
 	if (err != 0) {
-		BT_ERR("MICS service register failed: %d", err);
+		LOG_ERR("MICS service register failed: %d", err);
 	}
 
 	micp_inst.cb = param->cb;
@@ -195,7 +196,7 @@ int bt_micp_mic_dev_mute_disable(void)
 int bt_micp_mic_dev_included_get(struct bt_micp_included *included)
 {
 	CHECKIF(included == NULL) {
-		BT_DBG("NULL service pointer");
+		LOG_DBG("NULL service pointer");
 		return -EINVAL;
 	}
 

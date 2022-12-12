@@ -309,7 +309,7 @@ static int mpu9250_init(const struct device *dev)
 	}
 
 	ret = i2c_reg_write_byte_dt(&cfg->i2c, MPU9250_REG_ACCEL_CFG2,
-				    cfg->gyro_dlpf);
+				    cfg->accel_dlpf);
 	if (ret < 0) {
 		LOG_ERR("Failed to write accel digital LPF settings.");
 		return ret;
@@ -358,7 +358,7 @@ static int mpu9250_init(const struct device *dev)
 		  (.int_pin = GPIO_DT_SPEC_INST_GET(inst, irq_gpios)))	\
 	};								\
 									\
-	DEVICE_DT_INST_DEFINE(inst, mpu9250_init, NULL,			\
+	SENSOR_DEVICE_DT_INST_DEFINE(inst, mpu9250_init, NULL,		\
 			      &mpu9250_data_##inst, &mpu9250_cfg_##inst,\
 			      POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,	\
 			      &mpu9250_driver_api);

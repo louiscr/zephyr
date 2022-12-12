@@ -8,7 +8,7 @@
 
 #include <zephyr/device.h>
 #include <zephyr/lorawan/lorawan.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 
 /* Customize based on network configuration */
 #define LORAWAN_DEV_EUI			{ 0xDD, 0xEE, 0xAA, 0xDD, 0xBB, 0xEE,\
@@ -64,6 +64,17 @@ void main(void)
 		LOG_ERR("%s: device not ready.", lora_dev->name);
 		return;
 	}
+
+#if defined(CONFIG_LORAMAC_REGION_EU868)
+	/* If more than one region Kconfig is selected, app should set region
+	 * before calling lorawan_start()
+	 */
+	ret = lorawan_set_region(LORAWAN_REGION_EU868);
+	if (ret < 0) {
+		LOG_ERR("lorawan_set_region failed: %d", ret);
+		return;
+	}
+#endif
 
 	ret = lorawan_start();
 	if (ret < 0) {

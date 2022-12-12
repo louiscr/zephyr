@@ -6,7 +6,7 @@
 
 #include <arm/armv7-m.dtsi>
 #include <mem.h>
-#include <dt-bindings/clock/ast10x0_clock.h>
+#include <zephyr/dt-bindings/clock/ast10x0_clock.h>
 
 / {
 	cpus {
@@ -31,6 +31,11 @@
 			sysclk: sysclk {
 				compatible = "aspeed,ast10x0-clock";
 				#clock-cells = <1>;
+			};
+
+			sysrst: sysrst {
+				compatible = "aspeed,ast10x0-reset";
+				#reset-cells = <1>;
 			};
 		};
 
