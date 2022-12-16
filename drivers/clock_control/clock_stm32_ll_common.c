@@ -434,7 +434,7 @@ static inline void stm32_clock_control_mco_init(void)
 	LL_RCC_ConfigMCO(MCO1_SOURCE);
 #else
 	LL_RCC_ConfigMCO(MCO1_SOURCE,
-			 mco1_prescaler(CONFIG_CLOCK_STM32_MCO1_DIV));
+			 mco1_prescaler(1));
 #endif
 #endif /* CONFIG_CLOCK_STM32_MCO1_SRC_NOCLOCK */
 
