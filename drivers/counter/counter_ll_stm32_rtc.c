@@ -15,6 +15,8 @@
 
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
 #include <zephyr/drivers/clock_control.h>
+#include <zephyr/pm/pm.h>
+#include <zephyr/pm/device.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/kernel.h>
 #include <soc.h>
@@ -27,8 +29,12 @@
 
 #include <zephyr/logging/log.h>
 #include <zephyr/irq.h>
+#include <zephyr/pm/policy.h>
+#include <zephyr/drivers/gpio.h>
 
 #include "stm32_hsem.h"
+
+const struct gpio_dt_spec led_0 = GPIO_DT_SPEC_GET(DT_NODELABEL(led_0), gpios);
 
 LOG_MODULE_REGISTER(counter_rtc_stm32, CONFIG_COUNTER_LOG_LEVEL);
 
@@ -227,9 +233,12 @@ static int rtc_stm32_set_value(const struct device *dev, uint32_t ticks)
 	time.tm_year -= 100;
 	time.tm_mon += 1;
 	
+	LL_PWR_EnableBkUpAccess();
 	LL_RTC_DisableWriteProtection(RTC);
 	LL_RTC_EnterInitMode(RTC);
 	
+	k_msleep(100);
+
 	LL_RTC_DATE_SetYear(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_year));
 	LL_RTC_DATE_SetMonth(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_mon));
 	LL_RTC_DATE_SetDay(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_mday));
@@ -237,9 +246,11 @@ static int rtc_stm32_set_value(const struct device *dev, uint32_t ticks)
 	LL_RTC_TIME_SetMinute(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_min));
 	LL_RTC_TIME_SetSecond(RTC, __LL_RTC_CONVERT_BIN2BCD(time.tm_sec));
 	
+	//LL_RTC_DisableInitMode(RTC);
 	LL_RTC_ExitInitMode(RTC);
 	LL_RTC_EnableWriteProtection(RTC);
-	
+	LL_PWR_DisableBkUpAccess();
+
 	return 0;
 }
 
@@ -259,7 +270,7 @@ static int rtc_stm32_set_alarm(const struct device *dev, uint8_t chan_id,
 	uint32_t ticks = alarm_cfg->ticks;
 
 	if (data->callback != NULL) {
-		LOG_DBG("Alarm busy\n");
+		LOG_DBG("Alarm busy");
 		return -EBUSY;
 	}
 
@@ -294,7 +305,7 @@ static int rtc_stm32_set_alarm(const struct device *dev, uint8_t chan_id,
 #endif
 
 #if !defined(COUNTER_NO_DATE)
-	LOG_DBG("Set Alarm: %d\n", ticks);
+	LOG_DBG("Set Alarm: %d", ticks);
 
 	gmtime_r(&alarm_val, &alarm_tm);
 
@@ -314,20 +325,23 @@ static int rtc_stm32_set_alarm(const struct device *dev, uint8_t chan_id,
 	remain -= rtc_alarm.AlarmTime.Minutes * 60;
 	rtc_alarm.AlarmTime.Seconds = remain;
 #endif
-
+	LL_PWR_EnableBkUpAccess();
 	LL_RTC_DisableWriteProtection(RTC);
 	ll_func_disable_alarm(RTC);
 	LL_RTC_EnableWriteProtection(RTC);
 
 	if (ll_func_init_alarm(RTC, LL_RTC_FORMAT_BIN, &rtc_alarm) != SUCCESS) {
+		LOG_ERR("unable to init alarm");
 		return -EIO;
 	}
 
+	LL_PWR_EnableBkUpAccess();
 	LL_RTC_DisableWriteProtection(RTC);
 	ll_func_enable_alarm(RTC);
 	ll_func_clear_alarm_flag(RTC);
 	ll_func_enable_interrupt_alarm(RTC);
 	LL_RTC_EnableWriteProtection(RTC);
+	LL_PWR_DisableBkUpAccess();
 
 	return 0;
 }
@@ -337,6 +351,7 @@ static int rtc_stm32_cancel_alarm(const struct device *dev, uint8_t chan_id)
 {
 	struct rtc_stm32_data *data = dev->data;
 
+	LL_PWR_EnableBkUpAccess();
 	LL_RTC_DisableWriteProtection(RTC);
 	ll_func_clear_alarm_flag(RTC);
 	ll_func_disable_interrupt_alarm(RTC);
@@ -370,12 +385,11 @@ static int rtc_stm32_set_top_value(const struct device *dev,
 
 	if ((cfg->ticks != info->max_top_value) ||
 		!(cfg->flags & COUNTER_TOP_CFG_DONT_RESET)) {
+		LOG_ERR("top value set error");
 		return -ENOTSUP;
 	} else {
 		return 0;
 	}
-
-
 }
 
 void rtc_stm32_isr(const struct device *dev)
@@ -387,11 +401,15 @@ void rtc_stm32_isr(const struct device *dev)
 
 	if (ll_func_is_active_alarm(RTC) != 0) {
 
+		LL_PWR_EnableBkUpAccess();
 		LL_RTC_DisableWriteProtection(RTC);
 		ll_func_clear_alarm_flag(RTC);
-		ll_func_disable_interrupt_alarm(RTC);
-		ll_func_disable_alarm(RTC);
+		// ll_func_disable_interrupt_alarm(RTC);
+		// ll_func_disable_alarm(RTC);
 		LL_RTC_EnableWriteProtection(RTC);
+
+		LL_PWR_DisableBkUpAccess();
+		ll_func_clear_alarm_flag(RTC);
 
 		if (alarm_callback != NULL) {
 			data->callback = NULL;
@@ -426,7 +444,7 @@ static int rtc_stm32_init(const struct device *dev)
 
 	/* Enable RTC bus clock */
 	if (clock_control_on(clk, (clock_control_subsys_t *) &cfg->pclken[0]) != 0) {
-		LOG_ERR("clock op failed\n");
+		LOG_ERR("clock op failed");
 		return -EIO;
 	}
 
@@ -438,9 +456,13 @@ static int rtc_stm32_init(const struct device *dev)
 	if (clock_control_configure(clk,
 				    (clock_control_subsys_t *) &cfg->pclken[1],
 				    NULL) != 0) {
-		LOG_ERR("clock configure failed\n");
+		LOG_ERR("clock configure failed");
 		return -EIO;
 	}
+
+	// LL_RCC_ForceBackupDomainReset();
+  	// LL_RCC_ReleaseBackupDomainReset();
+    // LL_RCC_SetRTCClockSource(LL_RCC_RTC_CLKSOURCE_LSE);
 
 	LL_RCC_EnableRTC();
 
@@ -448,12 +470,14 @@ static int rtc_stm32_init(const struct device *dev)
 
 #if !defined(CONFIG_COUNTER_RTC_STM32_SAVE_VALUE_BETWEEN_RESETS)
 	if (LL_RTC_DeInit(RTC) != SUCCESS) {
+		LOG_ERR("save value set error LL_RTC_DeInit");
 		return -EIO;
 	}
 #endif
 
 	if (LL_RTC_Init(RTC, ((LL_RTC_InitTypeDef *)
 			      &cfg->ll_rtc_config)) != SUCCESS) {
+		LOG_ERR("save value set error LL_RTC_Init");
 		return -EIO;
 	}
 
@@ -462,6 +486,10 @@ static int rtc_stm32_init(const struct device *dev)
 	LL_RTC_EnableShadowRegBypass(RTC);
 	LL_RTC_EnableWriteProtection(RTC);
 #endif /* RTC_CR_BYPSHAD */
+
+	/* Set prescaler according to source clock */
+	// LL_RTC_SetAsynchPrescaler(RTC, cfg->ll_rtc_config.AsynchPrescaler);
+	// LL_RTC_SetSynchPrescaler(RTC, cfg->ll_rtc_config.SynchPrescaler);
 
 #if defined(CONFIG_SOC_SERIES_STM32H7X) && defined(CONFIG_CPU_CORTEX_M4)
 	LL_C2_EXTI_EnableIT_0_31(RTC_EXTI_LINE);
@@ -529,6 +557,42 @@ static const struct rtc_stm32_config rtc_config = {
 	.pclken = rtc_clk,
 };
 
+#ifdef CONFIG_PM_DEVICE
+static int rtc_stm32_pm_action(const struct device *dev, enum pm_device_action action)
+{
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct rtc_stm32_config *config = dev->config;
+	int err;
+
+	switch (action) {
+	case PM_DEVICE_ACTION_RESUME:
+		/* enable clock */
+		err = clock_control_on(clk, (clock_control_subsys_t)&config->pclken[0]);
+		if (err != 0) {
+			LOG_ERR("Could not enable rtc clock");
+			return err;
+		}
+		// ll_func_init_alarm();
+		// rtc_stm32_irq_config(dev);
+
+		break;
+	case PM_DEVICE_ACTION_SUSPEND:
+		err = clock_control_off(clk, (clock_control_subsys_t)&config->pclken[0]);
+		if (err != 0) {
+			LOG_ERR("Could not disable rtc clock");
+			return err;
+		}
+		// ll_func_init_alarm();
+		// rtc_stm32_irq_config(dev);
+
+		break;
+	default:
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_PM_DEVICE */
 
 static const struct counter_driver_api rtc_stm32_driver_api = {
 		.start = rtc_stm32_start,
@@ -542,9 +606,14 @@ static const struct counter_driver_api rtc_stm32_driver_api = {
 		.get_top_value = rtc_stm32_get_top_value,
 };
 
-DEVICE_DT_INST_DEFINE(0, &rtc_stm32_init, NULL,
-		    &rtc_data, &rtc_config, PRE_KERNEL_1,
-		    CONFIG_COUNTER_INIT_PRIORITY, &rtc_stm32_driver_api);
+PM_DEVICE_DT_INST_DEFINE(0, rtc_stm32_pm_action);
+
+DEVICE_DT_INST_DEFINE(0, 
+			&rtc_stm32_init,
+ 			NULL,
+		    &rtc_data, &rtc_config,
+			PRE_KERNEL_1, CONFIG_COUNTER_INIT_PRIORITY,
+			&rtc_stm32_driver_api);
 
 static void rtc_stm32_irq_config(const struct device *dev)
 {
