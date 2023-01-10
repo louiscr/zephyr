@@ -34,8 +34,6 @@
 
 #include "stm32_hsem.h"
 
-const struct gpio_dt_spec led_0 = GPIO_DT_SPEC_GET(DT_NODELABEL(led_0), gpios);
-
 LOG_MODULE_REGISTER(counter_rtc_stm32, CONFIG_COUNTER_LOG_LEVEL);
 
 /* Seconds from 1970-01-01T00:00:00 to 2000-01-01T00:00:00 */
@@ -451,6 +449,8 @@ static int rtc_stm32_init(const struct device *dev)
 	/* Enable Backup access */
 	z_stm32_hsem_lock(CFG_HW_RCC_SEMID, HSEM_LOCK_DEFAULT_RETRY);
 	LL_PWR_EnableBkUpAccess();
+	// LL_RCC_ForceBackupDomainReset();
+  	// LL_RCC_ReleaseBackupDomainReset();
 
 	/* Enable RTC clock source */
 	if (clock_control_configure(clk,
@@ -459,10 +459,6 @@ static int rtc_stm32_init(const struct device *dev)
 		LOG_ERR("clock configure failed");
 		return -EIO;
 	}
-
-	// LL_RCC_ForceBackupDomainReset();
-  	// LL_RCC_ReleaseBackupDomainReset();
-    // LL_RCC_SetRTCClockSource(LL_RCC_RTC_CLKSOURCE_LSE);
 
 	LL_RCC_EnableRTC();
 
@@ -610,7 +606,7 @@ PM_DEVICE_DT_INST_DEFINE(0, rtc_stm32_pm_action);
 
 DEVICE_DT_INST_DEFINE(0, 
 			&rtc_stm32_init,
- 			NULL,
+			PM_DEVICE_DT_INST_GET(0),
 		    &rtc_data, &rtc_config,
 			PRE_KERNEL_1, CONFIG_COUNTER_INIT_PRIORITY,
 			&rtc_stm32_driver_api);

@@ -15,6 +15,8 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/crc.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/pm/policy.h>
+#include <zephyr/pm/device.h>
 
 #include "sht3xd.h"
 
@@ -206,6 +208,28 @@ static int sht3xd_init(const struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_DEVICE
+static int sht3xd_pm_action(const struct device *dev,
+			    enum pm_device_action action)
+{
+	int ret = 0;
+
+	switch (action) {
+	case PM_DEVICE_ACTION_RESUME:
+		/* Re-initialize the chip */
+		ret = sht3xd_init(dev);
+		break;
+	case PM_DEVICE_ACTION_SUSPEND:
+		/* Put the chip into sleep mode */
+		break;
+	default:
+		return -ENOTSUP;
+	}
+
+	return ret;
+}
+#endif /* CONFIG_PM_DEVICE */
+
 #ifdef CONFIG_SHT3XD_TRIGGER
 #define SHT3XD_TRIGGER_INIT(inst)						\
 	.alert_gpio = GPIO_DT_SPEC_INST_GET(inst, alert_gpios),
@@ -217,11 +241,17 @@ static int sht3xd_init(const struct device *dev)
 	struct sht3xd_data sht3xd0_data_##inst;					\
 	static const struct sht3xd_config sht3xd0_cfg_##inst = {		\
 		.bus = I2C_DT_SPEC_INST_GET(inst),				\
-		SHT3XD_TRIGGER_INIT(inst)					\
-	};									\
-	SENSOR_DEVICE_DT_INST_DEFINE(inst, sht3xd_init, NULL,			\
-		&sht3xd0_data_##inst, &sht3xd0_cfg_##inst,			\
-		POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,			\
+		SHT3XD_TRIGGER_INIT(inst)						\
+	};													\
+														\
+	PM_DEVICE_DT_INST_DEFINE(inst, sht3xd_pm_action);	\
+														\
+	SENSOR_DEVICE_DT_INST_DEFINE(inst, 					\
+		sht3xd_init,									\
+		PM_DEVICE_DT_INST_GET(inst),					\
+		&sht3xd0_data_##inst,							\
+		&sht3xd0_cfg_##inst,							\
+		POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,		\
 		&sht3xd_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SHT3XD_DEFINE)

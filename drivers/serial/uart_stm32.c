@@ -1591,6 +1591,8 @@ static int uart_stm32_init(const struct device *dev)
 
 	__uart_stm32_get_clock(dev);
 
+	LOG_WRN("uart dev %s init", dev->name);
+
 	if (!device_is_ready(data->clock)) {
 		LOG_ERR("clock control device not ready");
 		return -ENODEV;
@@ -1759,7 +1761,6 @@ static int uart_stm32_pm_action(const struct device *dev,
 	const struct uart_stm32_config *config = dev->config;
 	struct uart_stm32_data *data = dev->data;
 	int err;
-
 
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:

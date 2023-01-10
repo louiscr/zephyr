@@ -45,18 +45,22 @@ int pm_device_action_run(const struct device *dev,
 	int ret;
 
 	if (pm == NULL) {
+		LOG_WRN("no pm for %s", dev->name);
 		return -ENOSYS;
 	}
 
 	if (pm_device_state_is_locked(dev)) {
+		LOG_WRN("pm device %s locked", dev->name);
 		return -EPERM;
 	}
 
 	/* Validate action against current state */
 	if (pm->state == action_target_state[action]) {
+		LOG_WRN("already in pm state %s", dev->name);
 		return -EALREADY;
 	}
 	if (pm->state != action_expected_state[action]) {
+		LOG_WRN("pm state %s not sup", dev->name);
 		return -ENOTSUP;
 	}
 

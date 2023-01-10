@@ -16,6 +16,8 @@
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/pinctrl.h>
 #include "i2c_ll_stm32.h"
+#include <zephyr/pm/policy.h>
+#include <zephyr/pm/device.h>
 
 #define LOG_LEVEL CONFIG_I2C_LOG_LEVEL
 #include <zephyr/logging/log.h>
@@ -287,6 +289,83 @@ static int i2c_stm32_init(const struct device *dev)
 	return 0;
 }
 
+
+#ifdef CONFIG_PM_DEVICE
+static void i2c_stm32_suspend_setup(const struct device *dev)
+{
+	const struct i2c_stm32_config *config = dev->config;
+	// LOG_INF("I2C checking busy");
+
+	while (LL_I2C_IsActiveFlag_BUSY(config->i2c) == 1) {
+	}
+	// LOG_INF("I2C checking tc");
+
+	// while (LL_I2C_IsActiveFlag_TC(config->i2c) == 0) {
+	// }
+	LL_I2C_ClearFlag_OVR(config->i2c);
+	// LL_I2C_ClearFlag_TXE(config->i2c);
+	// LL_I2C_ClearFlag_NACK(config->i2c);
+	// LL_I2C_ClearFlag_STOP(config->i2c);
+
+}
+
+static int i2c_stm32_pm_action(const struct device *dev,
+			       enum pm_device_action action)
+{
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct i2c_stm32_config *config = dev->config;
+	int err;
+
+	if (!device_is_ready(clk)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
+	// LOG_DBG("I2C pm action");
+
+	switch (action) {
+	case PM_DEVICE_ACTION_RESUME:
+		/* Set pins to active state */
+		err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_DEFAULT);
+		if (err < 0) {
+			LOG_WRN("i2c pinctrl active state not available");
+			return err;
+		}
+
+		/* enable clock */
+		err = clock_control_on(clk, (clock_control_subsys_t)&config->pclken);
+		if (err != 0) {
+			LOG_ERR("Could not enable i2c clock");
+			return err;
+		}
+		break;
+	case PM_DEVICE_ACTION_SUSPEND:
+		i2c_stm32_suspend_setup(dev);
+		/* Stop device clock. Note: fixed clocks are not handled yet. */
+		err = clock_control_off(clk, (clock_control_subsys_t)&config->pclken);
+		if (err != 0) {
+			LOG_ERR("Could not disable i2c clock");
+			return err;
+		}
+
+		/* Move pins to sleep state */
+		err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_SLEEP);
+		if (err == -ENOENT) {
+			/* Warn but don't block PM suspend */
+			LOG_WRN("i2c pinctrl sleep state not available");
+		} else if (err < 0) {
+			return err;
+		}
+		break;
+	default:
+		LOG_WRN("i2c pm state not supported");
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_PM_DEVICE */
+
 /* Macros for I2C instance declaration */
 
 #ifdef CONFIG_I2C_STM32_INTERRUPT
@@ -369,8 +448,10 @@ static const struct i2c_stm32_config i2c_stm32_cfg_##name = {		\
 									\
 static struct i2c_stm32_data i2c_stm32_dev_data_##name;			\
 									\
+PM_DEVICE_DT_INST_DEFINE(DT_NODELABEL(name), i2c_stm32_pm_action);  \
+									\
 I2C_DEVICE_DT_DEFINE(DT_NODELABEL(name), i2c_stm32_init,		\
-		    NULL, &i2c_stm32_dev_data_##name,			\
+		    PM_DEVICE_DT_INST_GET(DT_NODELABEL(name)), &i2c_stm32_dev_data_##name,			\
 		    &i2c_stm32_cfg_##name,				\
 		    POST_KERNEL, CONFIG_I2C_INIT_PRIORITY,		\
 		    &api_funcs);					\
