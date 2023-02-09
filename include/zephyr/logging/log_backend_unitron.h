@@ -19,7 +19,8 @@ struct unitron_queue_item {
     uint32_t log_level;
     uint64_t timestamp;
     unsigned char* module_name;
-    unsigned char* logmessage;
+    uint32_t messagesize;
+    unsigned char logmessage [150];
 };
 
 extern struct k_msgq k_unitron_logs;

@@ -21,9 +21,6 @@
 #include <zephyr/sys/cbprintf.h>
 #include <ctype.h>
 
-
-#define HEXDUMP_BYTES_IN_LINE 16
-
 LOG_MODULE_REGISTER(log_unitron);
 
 struct k_msgq k_unitron_logs;
@@ -33,29 +30,24 @@ static uint32_t log_format_current = CONFIG_LOG_BACKEND_UNITRON_OUTPUT_DEFAULT;
 
 static volatile bool in_panic;
 
+struct unitron_queue_item item = {0};
+
 static int char_out(uint8_t *data, size_t length, void *ctx)
 {
 	ARG_UNUSED(ctx);
-	// printf("%d\n", length);
 	for (size_t i = 0; i < length; i++) {
-		printf("%c", (unsigned char)data[i]);
-	}	
+		// printf("%c", (unsigned char)data[i]);
+		if(item.messagesize<149){
+			item.logmessage[item.messagesize] = (unsigned char)data[i];
+			item.messagesize++;
+		}
+	}
 	return length;
-
-			// struct unitron_queue_item item = {0};
-		// int ret = k_msgq_put(&k_unitron_logs, &item, K_NO_WAIT);
-// if(ret == 0){
-// 		return length
-// }
-
-
 }
-
 
 //OUTPUT
 
-static void buffer_write_unitron(log_output_func_t outf, uint8_t *buf, size_t len,
-			 void *ctx)
+static void buffer_write_unitron(log_output_func_t outf, uint8_t *buf, size_t len, void *ctx)
 {
 	int processed;
 
@@ -73,6 +65,8 @@ void log_output_flush_unitron(const struct log_output *output)
 		     output->control_block->offset,
 		     output->control_block->ctx);
 
+	// push_to_unitron_logs(output->buf + output->control_block->offset);
+
 	output->control_block->offset = 0;
 }
 
@@ -80,15 +74,6 @@ static int out_func_unitron(int c, void *ctx)
 {
 	const struct log_output *out_ctx = (const struct log_output *)ctx;
 	int idx;
-
-	if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
-		/* Backend must be thread safe in synchronous operation. */
-		/* Need that step for big endian */
-		char x = (char)c;
-
-		out_ctx->func((uint8_t *)&x, 1, out_ctx->control_block->ctx);
-		return 0;
-	}
 
 	if (out_ctx->control_block->offset == out_ctx->size) {
 		log_output_flush_unitron(out_ctx);
@@ -102,126 +87,15 @@ static int out_func_unitron(int c, void *ctx)
 	return 0;
 }
 
-static int cr_out_func_unitron(int c, void *ctx)
-{
-	if (c == '\n') {
-		out_func_unitron((int)'\r', ctx);
-	}
-	out_func_unitron(c, ctx);
-
-	return 0;
-}
-
-static int print_formatted_unitron(const struct log_output *output,
-			   const char *fmt, ...)
-{
-	va_list args;
-	int length = 0;
-
-	va_start(args, fmt);
-	length = cbvprintf(out_func_unitron, (void *)output, fmt, args);
-	va_end(args);
-
-	return length;
-}
-
-static void newline_print_unitron(const struct log_output *ctx, uint32_t flags)
-{
-	if (IS_ENABLED(CONFIG_LOG_BACKEND_NET) &&
-	    flags & LOG_OUTPUT_FLAG_FORMAT_SYSLOG) {
-		return;
-	}
-
-	if ((flags & LOG_OUTPUT_FLAG_CRLF_NONE) != 0U) {
-		return;
-	}
-
-	if ((flags & LOG_OUTPUT_FLAG_CRLF_LFONLY) != 0U) {
-		print_formatted_unitron(ctx, "\n");
-	} else {
-		print_formatted_unitron(ctx, "\r\n");
-	}
-}
-
-static void hexdump_line_print_unitron(const struct log_output *output,
-			       const uint8_t *data, uint32_t length,
-			       int prefix_offset, uint32_t flags)
-{
-	newline_print_unitron(output, flags);
-
-	for (int i = 0; i < prefix_offset; i++) {
-		print_formatted_unitron(output, " ");
-	}
-
-	for (int i = 0; i < HEXDUMP_BYTES_IN_LINE; i++) {
-		if (i > 0 && !(i % 8)) {
-			print_formatted_unitron(output, " ");
-		}
-
-		if (i < length) {
-			print_formatted_unitron(output, "%02x ", data[i]);
-		} else {
-			print_formatted_unitron(output, "   ");
-		}
-	}
-
-	print_formatted_unitron(output, "|");
-
-	for (int i = 0; i < HEXDUMP_BYTES_IN_LINE; i++) {
-		if (i > 0 && !(i % 8)) {
-			print_formatted_unitron(output, " ");
-		}
-
-		if (i < length) {
-			unsigned char c = (unsigned char)data[i];
-
-			print_formatted_unitron(output, "%c",
-			      isprint((int)c) ? c : '.');
-		} else {
-			print_formatted_unitron(output, " ");
-		}
-	}
-}
-
-static void log_msg_hexdump_unitron(const struct log_output *output,
-			    uint8_t *data, uint32_t len,
-			    int prefix_offset, uint32_t flags)
-{
-	size_t length;
-
-	do {
-		length = MIN(len, HEXDUMP_BYTES_IN_LINE);
-
-		hexdump_line_print_unitron(output, data, length,
-				   prefix_offset, flags);
-		data += length;
-		len -= length;
-	} while (len);
-}
-
-void log_output_process_unitron(const struct log_output *output,
-			log_timestamp_t timestamp,
-			const char *domain,
-			const char *source,
-			uint8_t level,
-			const uint8_t *package,
-			const uint8_t *data,
-			size_t data_len,
-			uint32_t flags)
-{
-	cbprintf_cb cb = ((uintptr_t)source == 1) ? out_func_unitron : cr_out_func_unitron;
-	
+void log_output_process_unitron(const struct log_output *output, const uint8_t *package)
+{	
 	if (package) {
-		int err = cbpprintf(cb, (void *)output, (void *)package);
+		int err = cbpprintf(out_func_unitron, (void *)output, (void *)package);
 
 		(void)err;
 		__ASSERT_NO_MSG(err >= 0);
-	}
-
-	if (data_len) {
-		log_msg_hexdump_unitron(output, (uint8_t *)data, data_len, 0, flags);
-	}
-
+	} 
+	
 	log_output_flush_unitron(output);
 }
 
@@ -251,10 +125,39 @@ void log_output_msg_process_unitron(const struct log_output *output,
 	const char *sname = source_id >= 0 ? log_source_name_get(domain_id, source_id) : NULL;
 	size_t plen, dlen;
 	uint8_t *package = log_msg_get_package(msg, &plen);
-	uint8_t *data = log_msg_get_data(msg, &dlen);
 
-	log_output_process_unitron(output, timestamp, NULL, sname, level,
-			   plen > 0 ? package : NULL, data, dlen, flags);
+	memset(&item, 0, sizeof(item));
+	
+	item.log_level = level;
+	item.timestamp = timestamp;	
+
+	item.module_name = (unsigned char *) malloc(strlen(sname) + 1);  // allocate memory for the string
+	strcpy(item.module_name, sname);
+
+	log_output_process_unitron(output, plen > 0 ? package : NULL);
+
+	// item.logmessage = (unsigned char *) malloc(output->size + 1);  // allocate memory for the string
+	// strcpy(item.logmessage, (unsigned char *)output->buf);
+
+	uint8_t * buffer = output->buf;
+	size_t size = output->control_block->offset;
+
+	// printf("size %d msg: ",size);
+
+	// while (size != 0){
+	// 	printf("%c", (unsigned char)*buffer);
+	// 	size--;
+	// 	buffer++;
+	// }
+	
+	// printf("\n");
+
+	// output->control_block->offset=0;
+
+	int ret = k_msgq_put(&k_unitron_logs, &item, K_NO_WAIT);
+	if(ret){
+		// LOG_WRN("impossible to add to queue %d", ret);
+	}
 }
 
 static uint8_t unitron_output_buf[CONFIG_LOG_BACKEND_UNITRON_BUFFER_SIZE];
@@ -267,9 +170,6 @@ static void process(const struct log_backend *const backend,
 	uint8_t level = log_msg_get_level(&(msg->log));
 
 	if(level == LOG_LEVEL_ERR){
-		printk("%d\n", level);
-
-		//msg->log.hdr.desc.level = LOG_LEVEL_INTERNAL_RAW_STRING;
 
 		uint32_t flags = 0;//log_backend_std_get_flags();
 
@@ -278,25 +178,6 @@ static void process(const struct log_backend *const backend,
 		log_format_func_t log_output_func = log_format_func_t_get(log_format_current);
 
 		log_output_func(&log_output_unitron, &(msg->log), flags);
-
-		printf("\n");
-
-		size_t dlen;
-		uint8_t *data = log_msg_get_data(&msg->log, &dlen);
-		for (size_t i = 0; i < dlen; i++) {
-			unsigned char c = (unsigned char)data[i];
-			printf("%c", c);
-		}	
-		
-		printf("<= data\n");
-
-		size_t plen;
-		uint8_t *package = log_msg_get_package(&msg->log, &plen);
-		for (size_t i = 0; i < plen; i++) {
-			printf("%c", (unsigned char)package[i]);
-		}
-		
-		printf("<= package\n");
 
 
 		// struct unitron_queue_item item = {0};
