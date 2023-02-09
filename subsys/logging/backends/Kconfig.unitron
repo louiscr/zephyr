@@ -1,0 +1,32 @@
+# Copyright (c) 2021 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+config LOG_BACKEND_UNITRON
+	bool "UNITRON backend"
+	default y 
+	select LOG_OUTPUT
+	help
+	  When enabled backend is using UNITRON to output custom logs.
+
+if LOG_BACKEND_UNITRON
+
+config LOG_BACKEND_UNITRON_BUFFER_SIZE
+	int "Number of bytes to buffer in RAM before flushing"
+	default 150
+	help
+	  Sets the number of bytes which can be buffered in RAM before log_output_flush
+	  is automatically called on the backend.
+
+config LOG_BACKEND_UNITRON_AUTOSTART
+	bool "Automatically start UNITRON backend"
+	default y
+	help
+	  When enabled automatically start the UNITRON logging backend on
+	  application start. When disabled, the application needs to start
+	  the backend manually using log_backend_enable().
+
+backend = UNITRON
+backend-str = unitron
+source "subsys/logging/Kconfig.template.log_format_config"
+
+endif # LOG_BACKEND_UNITRON

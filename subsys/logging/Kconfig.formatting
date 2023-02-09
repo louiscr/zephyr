@@ -168,7 +168,7 @@ config LOG_OUTPUT_FORMAT_LINUX_TIMESTAMP
 	  which timestamps are printed as fixed point values with seconds on the
 	  left side of the point and microseconds on the right side.
 
-config LOG_OUTPUT_FORMAT_UNITRON
+config LOG_OUTPUT_FORMAT_UNITRON_TIMESTAMP
 	bool "Format timestamp in unitron format"
 	help
 		Timestamp as it should be

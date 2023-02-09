@@ -1295,7 +1295,7 @@ static int adc_stm32_init(const struct device *dev)
 }
 
 #ifdef CONFIG_PM_DEVICE
-static int adc_stm32_pm_action(const struct device *dev,
+/*static int adc_stm32_pm_action(const struct device *dev,
 			      enum pm_device_action action)
 {
 	int ret = 0;
@@ -1306,7 +1306,6 @@ static int adc_stm32_pm_action(const struct device *dev,
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
 
-		/* enable clock */
 		ret = clock_control_on(clk, (clock_control_subsys_t)&config->pclken);
 		if (ret != 0) {
 			LOG_ERR("Could not enable adc clock");
@@ -1361,6 +1360,7 @@ static int adc_stm32_pm_action(const struct device *dev,
 
 	return ret;
 }
+*/
 #endif /* CONFIG_PM_DEVICE */
 
 static const struct adc_driver_api api_stm32_driver_api = {
@@ -1462,9 +1462,9 @@ DEVICE_DT_INST_DEFINE(index,						\
 		    &adc_stm32_data_##index, &adc_stm32_cfg_##index,	\
 		    POST_KERNEL, CONFIG_ADC_INIT_PRIORITY,		\
 		    &api_stm32_driver_api);
-
+/*
 // PM_DEVICE_DT_INST_GET(index)
 // PM_DEVICE_DT_INST_DEFINE(index, adc_stm32_pm_action);			\
-
+*/
 
 DT_INST_FOREACH_STATUS_OKAY(STM32_ADC_INIT)
