@@ -30,53 +30,14 @@ static uint32_t log_format_current = CONFIG_LOG_BACKEND_UNITRON_OUTPUT_DEFAULT;
 
 static volatile bool in_panic;
 
-struct unitron_queue_item item = {0};
-
-static int char_out(uint8_t *data, size_t length, void *ctx)
-{
-	ARG_UNUSED(ctx);
-	for (size_t i = 0; i < length; i++) {
-		// printf("%c", (unsigned char)data[i]);
-		if(item.messagesize<149){
-			item.logmessage[item.messagesize] = (unsigned char)data[i];
-			item.messagesize++;
-		}
-	}
-	return length;
-}
-
-//OUTPUT
-
-static void buffer_write_unitron(log_output_func_t outf, uint8_t *buf, size_t len, void *ctx)
-{
-	int processed;
-
-	do {
-		processed = outf(buf, len, ctx);
-		len -= processed;
-		buf += processed;
-	} while (len != 0);
-}
-
-
-void log_output_flush_unitron(const struct log_output *output)
-{
-	buffer_write_unitron(output->func, output->buf,
-		     output->control_block->offset,
-		     output->control_block->ctx);
-
-	// push_to_unitron_logs(output->buf + output->control_block->offset);
-
-	output->control_block->offset = 0;
-}
-
 static int out_func_unitron(int c, void *ctx)
 {
 	const struct log_output *out_ctx = (const struct log_output *)ctx;
 	int idx;
 
 	if (out_ctx->control_block->offset == out_ctx->size) {
-		log_output_flush_unitron(out_ctx);
+		return -ENOMEM;
+		// log_output_flush_unitron(out_ctx);
 	}
 
 	idx = atomic_inc(&out_ctx->control_block->offset);
@@ -95,8 +56,6 @@ void log_output_process_unitron(const struct log_output *output, const uint8_t *
 		(void)err;
 		__ASSERT_NO_MSG(err >= 0);
 	} 
-	
-	log_output_flush_unitron(output);
 }
 
 void log_output_msg_process_unitron(const struct log_output *output,
@@ -123,11 +82,11 @@ void log_output_msg_process_unitron(const struct log_output *output,
 	}
 
 	const char *sname = source_id >= 0 ? log_source_name_get(domain_id, source_id) : NULL;
-	size_t plen, dlen;
+	size_t plen;
 	uint8_t *package = log_msg_get_package(msg, &plen);
 
-	memset(&item, 0, sizeof(item));
-	
+	struct unitron_queue_item item = {0};
+
 	item.log_level = level;
 	item.timestamp = timestamp;	
 
@@ -136,32 +95,19 @@ void log_output_msg_process_unitron(const struct log_output *output,
 
 	log_output_process_unitron(output, plen > 0 ? package : NULL);
 
-	// item.logmessage = (unsigned char *) malloc(output->size + 1);  // allocate memory for the string
-	// strcpy(item.logmessage, (unsigned char *)output->buf);
+	item.logmessage = (unsigned char *) malloc((size_t)output->control_block->offset + 1);  // allocate memory for the string
+	strncpy(item.logmessage, output->buf,(size_t)output->control_block->offset);
 
-	uint8_t * buffer = output->buf;
-	size_t size = output->control_block->offset;
-
-	// printf("size %d msg: ",size);
-
-	// while (size != 0){
-	// 	printf("%c", (unsigned char)*buffer);
-	// 	size--;
-	// 	buffer++;
-	// }
-	
-	// printf("\n");
-
-	// output->control_block->offset=0;
+	output->control_block->offset=0;
 
 	int ret = k_msgq_put(&k_unitron_logs, &item, K_NO_WAIT);
 	if(ret){
-		// LOG_WRN("impossible to add to queue %d", ret);
+		LOG_WRN("impossible to add to error queue %d", ret);
 	}
 }
 
 static uint8_t unitron_output_buf[CONFIG_LOG_BACKEND_UNITRON_BUFFER_SIZE];
-LOG_OUTPUT_DEFINE(log_output_unitron, char_out, unitron_output_buf, sizeof(unitron_output_buf));
+LOG_OUTPUT_DEFINE(log_output_unitron, NULL, unitron_output_buf, sizeof(unitron_output_buf));
 
 static void process(const struct log_backend *const backend,
 		union log_msg_generic *msg)
@@ -178,40 +124,6 @@ static void process(const struct log_backend *const backend,
 		log_format_func_t log_output_func = log_format_func_t_get(log_format_current);
 
 		log_output_func(&log_output_unitron, &(msg->log), flags);
-
-
-		// struct unitron_queue_item item = {0};
-		// item.log_level = level;
-
-		// void *source = (void *)log_msg_get_source(&(msg->log));
-		// uint8_t domain_id = log_msg_get_domain(&(msg->log));
-		// int16_t source_id = (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING) ? log_dynamic_source_id(source) : log_const_source_id(source));
-		// const char* name = log_source_name_get(domain_id, source_id);
-
-		// item.module_name = (unsigned char *) malloc(strlen(name) + 1);  // allocate memory for the string
-		// strcpy(item.module_name, name);
-
-		// uint64_t timestamp = log_msg_get_timestamp(&(msg->log));
-		// item.timestamp = timestamp;
-
-		// size_t len;
-		// uint8_t *data = log_msg_get_package(&(msg->log), &len);
-		// printf("%d\n", len);
-		// for (size_t i = 0; i < len; i++) {
-		// 	printf("%c", (unsigned char)data[i]);
-		// }	
-
-		// // item.module_name = (char *) malloc(strlen(name) + 1);  // allocate memory for the string
-		// item.logmessage = (unsigned char *) malloc(len + 1);  // allocate memory for the string
-
-		// snprintf(item.logmessage, len, "%s", data);
-
-		// printf("%s\n", item.logmessage);
-
-		// int ret = k_msgq_put(&k_unitron_logs, &item, K_NO_WAIT);
-		// if(ret){
-		// 	LOG_WRN("impossible to add to queue %d", ret);
-		// }
 	}
 }
 
