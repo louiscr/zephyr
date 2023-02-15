@@ -15,12 +15,12 @@
 #include <zephyr/kernel.h>
 
 
-struct unitron_queue_item {
+typedef struct unitron_queue_item {
     uint32_t log_level;
     uint64_t timestamp;
-    unsigned char* module_name;
-    unsigned char* logmessage;
-};
+    unsigned char module_name[20];
+    unsigned char logmessage [100];
+}unitron_queue_item_t;
 
 extern struct k_msgq k_unitron_logs;
 

@@ -33,17 +33,18 @@ static volatile bool in_panic;
 static int out_func_unitron(int c, void *ctx)
 {
 	const struct log_output *out_ctx = (const struct log_output *)ctx;
-	int idx;
 
 	if (out_ctx->control_block->offset == out_ctx->size) {
 		return -ENOMEM;
 		// log_output_flush_unitron(out_ctx);
 	}
 
-	idx = atomic_inc(&out_ctx->control_block->offset);
+	int idx = atomic_inc(&out_ctx->control_block->offset);
 	out_ctx->buf[idx] = (uint8_t)c;
 
-	__ASSERT_NO_MSG(out_ctx->control_block->offset <= out_ctx->size);
+	if(out_ctx->control_block->offset > out_ctx->size){
+		LOG_WRN("buffer overflow!");
+	}
 
 	return 0;
 }
@@ -53,8 +54,9 @@ void log_output_process_unitron(const struct log_output *output, const uint8_t *
 	if (package) {
 		int err = cbpprintf(out_func_unitron, (void *)output, (void *)package);
 
-		(void)err;
-		__ASSERT_NO_MSG(err >= 0);
+		if(err < 0){
+			LOG_WRN("problem with printing error to buffer");
+		}	
 	} 
 }
 
@@ -85,25 +87,30 @@ void log_output_msg_process_unitron(const struct log_output *output,
 	size_t plen;
 	uint8_t *package = log_msg_get_package(msg, &plen);
 
-	struct unitron_queue_item item = {0};
+	unitron_queue_item_t item = {0};
 
 	item.log_level = level;
 	item.timestamp = timestamp;	
 
-	item.module_name = (unsigned char *) malloc(strlen(sname) + 1);  // allocate memory for the string
-	strcpy(item.module_name, sname);
+	// item.module_name_len = (uint8_t)strlen(sname);
+	// item.module_name = (unsigned char *) malloc(strlen(sname) + 1);  // allocate memory for the string
+	strncpy(item.module_name, sname, 19);
 
 	log_output_process_unitron(output, plen > 0 ? package : NULL);
 
-	item.logmessage = (unsigned char *) malloc((size_t)output->control_block->offset + 1);  // allocate memory for the string
-	strncpy(item.logmessage, output->buf,(size_t)output->control_block->offset);
+	// item.logmessage_len = (uint8_t)output->control_block->offset;
+	// item.logmessage = (unsigned char *) malloc((size_t)output->control_block->offset + 1);  // allocate memory for the string
 
+	strncpy(item.logmessage, output->buf, 99);
+	memset(output->buf, 0, 100);
 	output->control_block->offset=0;
 
 	int ret = k_msgq_put(&k_unitron_logs, &item, K_NO_WAIT);
 	if(ret){
 		LOG_WRN("impossible to add to error queue %d", ret);
 	}
+
+	memset(&item, 0, sizeof(unitron_queue_item_t));
 }
 
 static uint8_t unitron_output_buf[CONFIG_LOG_BACKEND_UNITRON_BUFFER_SIZE];
@@ -116,13 +123,9 @@ static void process(const struct log_backend *const backend,
 	uint8_t level = log_msg_get_level(&(msg->log));
 
 	if(level == LOG_LEVEL_ERR){
-
 		uint32_t flags = 0;//log_backend_std_get_flags();
-
 		log_custom_output_msg_set(log_output_msg_process_unitron);
-
 		log_format_func_t log_output_func = log_format_func_t_get(log_format_current);
-
 		log_output_func(&log_output_unitron, &(msg->log), flags);
 	}
 }
