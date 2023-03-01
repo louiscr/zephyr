@@ -21,6 +21,8 @@
 #include <zephyr/drivers/dma.h>
 #include <zephyr/drivers/dma/dma_stm32.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/pm/policy.h>
+#include <zephyr/pm/device.h>
 
 #if DT_INST_NODE_HAS_PROP(0, spi_bus_width) && \
 	DT_INST_PROP(0, spi_bus_width) == 4
@@ -1279,6 +1281,89 @@ static int flash_stm32_qspi_init(const struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_DEVICE
+
+static int flash_stm32_qspi_send_dpd(const struct device *dev)
+{
+	QSPI_CommandTypeDef cmd = {
+		.Instruction = SPI_NOR_CMD_DPD,
+		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+	};
+	int ret;
+
+	ret = qspi_send_cmd(dev, &cmd);
+	if (ret != 0) {
+		LOG_ERR("%d: Failed to send DPD", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int flash_stm32_qspi_send_rdpd(const struct device *dev)
+{
+	QSPI_CommandTypeDef cmd = {
+		.Instruction = SPI_NOR_CMD_RDPD,
+		.InstructionMode = QSPI_INSTRUCTION_1_LINE,
+	};
+	int ret;
+
+	ret = qspi_send_cmd(dev, &cmd);
+	if (ret != 0) {
+		LOG_ERR("%d: Failed to send RDPD", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int flash_stm32_qspi_pm_action(const struct device *dev, enum pm_device_action action)
+{
+	const struct flash_stm32_qspi_config *dev_cfg = dev->config;
+	// struct flash_stm32_qspi_data *dev_data = dev->data;
+	int ret;
+	switch (action) {
+	case PM_DEVICE_ACTION_RESUME:
+
+		// flash_stm32_qspi_init(dev);
+
+		ret = pinctrl_apply_state(dev_cfg->pcfg, PINCTRL_STATE_DEFAULT);
+		if (ret < 0) {
+			LOG_ERR("QSPI pinctrl reinitialization failed (%d)", ret);
+			return ret;
+		}
+
+		#if STM32_QSPI_RESET_GPIO
+			flash_stm32_qspi_gpio_reset(dev);
+		// #else
+		// 	flash_stm32_qspi_send_rdpd(dev);
+		#endif
+
+
+		#if STM32_QSPI_USE_DMA
+			LOG_ERR("DMA Sleep not supported!");
+		#endif
+
+		break;
+	case PM_DEVICE_ACTION_SUSPEND:
+
+		flash_stm32_qspi_send_dpd(dev);
+
+		ret = pinctrl_apply_state(dev_cfg->pcfg, PINCTRL_STATE_SLEEP);
+		if (ret < 0) {
+			LOG_ERR("QSPI pinctrl sleep failed (%d)", ret);
+			return ret;
+		}
+
+		break;
+	default:
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+#endif
+
 #define DMA_CHANNEL_CONFIG(node, dir)					\
 		DT_DMAS_CELL_BY_NAME(node, dir, channel_config)
 
@@ -1355,7 +1440,9 @@ static struct flash_stm32_qspi_data flash_stm32_qspi_dev_data = {
 	QSPI_DMA_CHANNEL(STM32_QSPI_NODE, tx_rx)
 };
 
-DEVICE_DT_INST_DEFINE(0, &flash_stm32_qspi_init, NULL,
+PM_DEVICE_DT_INST_DEFINE(0, flash_stm32_qspi_pm_action);		        
+
+DEVICE_DT_INST_DEFINE(0, &flash_stm32_qspi_init, PM_DEVICE_DT_INST_GET(0),
 		      &flash_stm32_qspi_dev_data, &flash_stm32_qspi_cfg,
 		      POST_KERNEL, CONFIG_FLASH_INIT_PRIORITY,
 		      &flash_stm32_qspi_driver_api);
