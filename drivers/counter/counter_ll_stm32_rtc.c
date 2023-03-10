@@ -497,6 +497,8 @@ static int rtc_stm32_init(const struct device *dev)
 	LL_EXTI_EnableRisingTrig_0_31(RTC_EXTI_LINE);
 #endif
 
+	// LL_PWR_EnableInternWU();
+
 	rtc_stm32_irq_config(dev);
 
 	return 0;

@@ -22,9 +22,15 @@
 
 LOG_MODULE_REGISTER(SHT3XD, CONFIG_SENSOR_LOG_LEVEL);
 
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(temp_pwr_en_gpio), okay) && DT_NODE_HAS_PROP(DT_NODELABEL(temp_pwr_en_gpio), gpios)
+// const struct gpio_dt_spec temp_pwr_en_gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(temp_pwr_en_gpio), gpios);
+// #else
+// const struct gpio_dt_spec adu_pwr_en_gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(adu_pwr_en_gpio), gpios);
+// #endif
+
 #ifdef CONFIG_SHT3XD_SINGLE_SHOT_MODE
 static const uint16_t measure_cmd[3] = {
-	0x2400, 0x240B, 0x2416
+	0x2416, 0x240B, 0x2400
 };
 #endif
 #ifdef CONFIG_SHT3XD_PERIODIC_MODE
@@ -89,13 +95,13 @@ static int sht3xd_sample_fetch(const struct device *dev,
 	if (sht3xd_write_command(dev,
 				 measure_cmd[SHT3XD_REPEATABILITY_IDX])
 	    < 0) {
-		LOG_DBG("Failed to set single shot measurement mode!");
+		LOG_ERR("Failed to set single shot measurement mode!");
 		return -EIO;
 	}
 	k_sleep(K_MSEC(measure_wait[SHT3XD_REPEATABILITY_IDX] / USEC_PER_MSEC));
 
 	if (i2c_read_dt(&config->bus, rx_buf, sizeof(rx_buf)) < 0) {
-		LOG_DBG("Failed to read data sample!");
+		LOG_ERR("Failed to read data sample!");
 		return -EIO;
 	}
 #endif
@@ -106,20 +112,20 @@ static int sht3xd_sample_fetch(const struct device *dev,
 
 	if (i2c_write_read_dt(&config->bus, tx_buf, sizeof(tx_buf),
 			      rx_buf, sizeof(rx_buf)) < 0) {
-		LOG_DBG("Failed to read data sample!");
+		LOG_ERR("Failed to read data sample!");
 		return -EIO;
 	}
 #endif
 
 	t_sample = sys_get_be16(&rx_buf[0]);
 	if (sht3xd_compute_crc(t_sample) != rx_buf[2]) {
-		LOG_DBG("Received invalid temperature CRC!");
+		LOG_WRN("Received invalid temperature CRC!");
 		return -EIO;
 	}
 
 	rh_sample = sys_get_be16(&rx_buf[3]);
 	if (sht3xd_compute_crc(rh_sample) != rx_buf[5]) {
-		LOG_DBG("Received invalid relative humidity CRC!");
+		LOG_WRN("Received invalid relative humidity CRC!");
 		return -EIO;
 	}
 
@@ -170,6 +176,20 @@ static const struct sensor_driver_api sht3xd_driver_api = {
 static int sht3xd_init(const struct device *dev)
 {
 	const struct sht3xd_config *cfg = dev->config;
+// 	int ret = 0;
+
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(temp_pwr_en_gpio), okay) && DT_NODE_HAS_PROP(DT_NODELABEL(temp_pwr_en_gpio), gpios)
+// 	if((ret = gpio_pin_set_dt(&temp_pwr_en_gpio, 1))!=0) {
+// 		LOG_ERR("temp_pwr_en to 1: %d",ret);
+// 		return ret;
+// 	}
+// #else
+// 	if((ret = gpio_pin_set_dt(&adu_pwr_en_gpio, 1))!=0) {
+// 		LOG_ERR("adu_pwr_en_gpio to 1: %d",ret);
+// 		return ret;
+// 	}
+// #endif
+// 	k_busy_wait(5000);
 
 	if (!device_is_ready(cfg->bus.bus)) {
 		LOG_ERR("I2C bus %s is not ready!", cfg->bus.bus->name);
@@ -178,7 +198,7 @@ static int sht3xd_init(const struct device *dev)
 
 	/* clear status register */
 	if (sht3xd_write_command(dev, SHT3XD_CMD_CLEAR_STATUS) < 0) {
-		LOG_DBG("Failed to clear status register!");
+		LOG_WRN("Failed to clear status register!");
 		return -EIO;
 	}
 
@@ -189,7 +209,7 @@ static int sht3xd_init(const struct device *dev)
 	if (sht3xd_write_command(dev,
 				 measure_cmd[SHT3XD_MPS_IDX][SHT3XD_REPEATABILITY_IDX])
 	    < 0) {
-		LOG_DBG("Failed to set measurement mode!");
+		LOG_ERR("Failed to set measurement mode!");
 		return -EIO;
 	}
 
@@ -200,7 +220,7 @@ static int sht3xd_init(const struct device *dev)
 
 	data->dev = dev;
 	if (sht3xd_init_interrupt(dev) < 0) {
-		LOG_DBG("Failed to initialize interrupt");
+		LOG_ERR("Failed to initialize interrupt");
 		return -EIO;
 	}
 #endif
@@ -216,11 +236,25 @@ static int sht3xd_pm_action(const struct device *dev,
 
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
+			// LOG_WRN("temp pwr resume");
+
 		/* Re-initialize the chip */
-		ret = sht3xd_init(dev);
+		sht3xd_init(dev);
 		break;
 	case PM_DEVICE_ACTION_SUSPEND:
 		/* Put the chip into sleep mode */
+		// LOG_WRN("temp pwr save");
+		// int ret2 = 0;
+		// #if DT_NODE_HAS_STATUS(DT_NODELABEL(temp_pwr_en_gpio), okay) && DT_NODE_HAS_PROP(DT_NODELABEL(temp_pwr_en_gpio), gpios)
+		// 	if((ret2 = gpio_pin_set_dt(&temp_pwr_en_gpio, 0))!=0) {
+		// 		LOG_ERR("temp_pwr_en_gpio to 0: %d", ret2);
+		// 	}
+		// #else
+		// 	if((ret2 = gpio_pin_set_dt(&adu_pwr_en_gpio, 0))!=0) {
+		// 		LOG_ERR("adu_pwr_en_gpio to 0: %d", ret2);
+		// 	}
+		// #endif
+
 		break;
 	default:
 		return -ENOTSUP;
