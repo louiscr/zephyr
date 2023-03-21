@@ -83,7 +83,6 @@ static int sht3xd_sample_fetch(const struct device *dev,
 	uint16_t t_sample, rh_sample;
 
 	__ASSERT_NO_MSG(chan == SENSOR_CHAN_ALL);
-
 #ifdef CONFIG_SHT3XD_SINGLE_SHOT_MODE
 	/* start single shot measurement */
 	if (sht3xd_write_command(dev,

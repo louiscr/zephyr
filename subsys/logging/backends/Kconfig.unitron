@@ -3,7 +3,7 @@
 
 config LOG_BACKEND_UNITRON
 	bool "UNITRON backend"
-	default y 
+	default n 
 	select LOG_OUTPUT
 	help
 	  When enabled backend is using UNITRON to output custom logs.
